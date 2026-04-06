@@ -38,6 +38,10 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const currentTemplate = getTemplate(state.selectedTemplate);
   const fps = currentTemplate?.fps ?? 30;
@@ -133,6 +137,155 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
       document.exitFullscreen();
     }
   }, []);
+
+  // ===== PC用ダウンロード（Canvas + MediaRecorder） =====
+  const handleDownload = useCallback(async () => {
+    setIsDownloading(true);
+    setDownloadProgress(0);
+    setDownloadError(null);
+    setDownloadUrl(null);
+
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1080;
+      canvas.height = 1920;
+      const ctx = canvas.getContext("2d")!;
+
+      // 音声ミキシング
+      const audioCtx = new AudioContext();
+      const dest = audioCtx.createMediaStreamDestination();
+      let hasAudio = false;
+
+      if (state.bgmFile) {
+        try {
+          const buf = await (await fetch(state.bgmFile)).arrayBuffer();
+          const decoded = await audioCtx.decodeAudioData(buf);
+          const src = audioCtx.createBufferSource();
+          src.buffer = decoded;
+          const gain = audioCtx.createGain();
+          gain.gain.value = state.bgmVolume;
+          src.connect(gain);
+          gain.connect(dest);
+          src.start();
+          hasAudio = true;
+        } catch (e) { console.warn("BGM:", e); }
+      }
+
+      if (state.narrationAudio) {
+        try {
+          const buf = await (await fetch(state.narrationAudio)).arrayBuffer();
+          const decoded = await audioCtx.decodeAudioData(buf);
+          const src = audioCtx.createBufferSource();
+          src.buffer = decoded;
+          const gain = audioCtx.createGain();
+          gain.gain.value = state.narrationVolume;
+          src.connect(gain);
+          gain.connect(dest);
+          src.start(audioCtx.currentTime + state.narrationStartSec);
+          hasAudio = true;
+        } catch (e) { console.warn("Narration:", e); }
+      }
+
+      const videoStream = canvas.captureStream(fps);
+      if (hasAudio) {
+        dest.stream.getAudioTracks().forEach((t) => videoStream.addTrack(t));
+      }
+
+      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+        ? "video/webm;codecs=vp9,opus" : "video/webm";
+      const recorder = new MediaRecorder(videoStream, { mimeType, videoBitsPerSecond: 5_000_000 });
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+
+      const done = new Promise<Blob>((resolve) => {
+        recorder.onstop = () => {
+          audioCtx.close();
+          resolve(new Blob(chunks, { type: "video/webm" }));
+        };
+      });
+
+      // Remotion Player を再生
+      if (playerRef.current) {
+        playerRef.current.seekTo(0);
+        playerRef.current.play();
+      }
+      recorder.start(100);
+
+      const totalMs = (durationInFrames / fps) * 1000;
+      const t0 = Date.now();
+      const primaryColor = state.primaryColor || "#1e3a5f";
+      const accentColor = state.accentColor || "#e8b04a";
+
+      const drawLoop = () => {
+        const elapsed = Date.now() - t0;
+        setDownloadProgress(Math.min(Math.round((elapsed / totalMs) * 100), 99));
+
+        // 背景
+        ctx.fillStyle = primaryColor;
+        ctx.fillRect(0, 0, 1080, 1920);
+
+        // タイトル（冒頭5秒）
+        if (elapsed < 5000 && state.titleText) {
+          ctx.fillStyle = "#ffffff";
+          ctx.font = `bold ${state.titleFontSize || 52}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.fillText(state.titleText, 540, 880);
+          if (state.contextLine) {
+            ctx.font = "28px sans-serif";
+            ctx.fillStyle = "#ffffffaa";
+            ctx.fillText(state.contextLine, 540, 960);
+          }
+        } else {
+          // メインテキスト
+          ctx.fillStyle = "#ffffff";
+          ctx.font = "bold 56px sans-serif";
+          ctx.textAlign = "center";
+          const text = state.quoteText || "";
+          const lines = text.match(/.{1,14}/g) || [text];
+          lines.forEach((line, i) => {
+            ctx.fillText(line, 540, 750 + i * 80);
+          });
+          ctx.fillStyle = accentColor;
+          ctx.fillRect(440, 750 + lines.length * 80 + 20, 200, 3);
+          if (state.speakerName) {
+            ctx.font = "36px sans-serif";
+            ctx.fillStyle = accentColor;
+            ctx.fillText(state.speakerName, 540, 750 + lines.length * 80 + 80);
+          }
+        }
+
+        // プログレスバー
+        ctx.fillStyle = accentColor;
+        ctx.globalAlpha = 0.6;
+        ctx.fillRect(0, 1916, 1080 * (elapsed / totalMs), 4);
+        ctx.globalAlpha = 1.0;
+
+        if (elapsed < totalMs) {
+          requestAnimationFrame(drawLoop);
+        } else {
+          recorder.stop();
+          playerRef.current?.pause();
+        }
+      };
+      requestAnimationFrame(drawLoop);
+
+      const blob = await done;
+      const url = URL.createObjectURL(blob);
+      setDownloadUrl(url);
+      setDownloadProgress(100);
+
+      // 自動ダウンロード
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `seminar-reel-${Date.now()}.webm`;
+      a.click();
+    } catch (err) {
+      console.error("Download error:", err);
+      setDownloadError("録画に失敗しました。もう一度お試しください。");
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [state, durationInFrames, fps]);
 
   const formatTime = (seconds: number) =>
     `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, "0")}`;
@@ -266,16 +419,51 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
           <p className="text-sm text-gray-500">フルスクリーンで再生して、スマホの画面録画で撮影しましょう</p>
         </div>
 
-        {/* フルスクリーン再生ボタン */}
-        <div className="flex justify-center">
+        {/* ボタン2つ: スマホ用 + PC用 */}
+        <div className="flex flex-col sm:flex-row justify-center gap-4">
+          {/* スマホ: フルスクリーン再生 */}
           <button onClick={handleFullscreenPlay}
-            className="px-10 py-5 text-xl font-bold text-white bg-gradient-to-r from-amber-600 to-amber-700 rounded-2xl hover:from-amber-700 hover:to-amber-800 transition-all shadow-xl flex items-center gap-3">
-            <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+            className="px-8 py-5 text-lg font-bold text-white bg-gradient-to-r from-amber-600 to-amber-700 rounded-2xl hover:from-amber-700 hover:to-amber-800 transition-all shadow-xl flex items-center justify-center gap-3">
+            <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
               <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
             </svg>
-            フルスクリーンで再生
+            📱 フルスクリーンで再生
+          </button>
+
+          {/* PC: 動画ダウンロード */}
+          <button onClick={handleDownload}
+            disabled={isDownloading}
+            className="px-8 py-5 text-lg font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-wait transition-all shadow-xl flex items-center justify-center gap-3">
+            {isDownloading ? (
+              <>
+                <div className="animate-spin w-6 h-6 border-2 border-white border-t-transparent rounded-full" />
+                録画中... {downloadProgress}%
+              </>
+            ) : (
+              <>
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                💻 PC用ダウンロード
+              </>
+            )}
           </button>
         </div>
+
+        {downloadError && (
+          <p className="text-center text-sm text-red-500">{downloadError}</p>
+        )}
+
+        {downloadUrl && (
+          <div className="text-center space-y-3 bg-green-50 rounded-xl p-5 max-w-md mx-auto">
+            <p className="text-green-700 font-medium">🎉 動画の録画が完了しました！</p>
+            <a href={downloadUrl} download={`seminar-reel-${Date.now()}.webm`}
+              className="inline-block px-6 py-3 text-base font-semibold text-white bg-green-600 rounded-xl hover:bg-green-700 transition-colors shadow">
+              ⬇️ ダウンロード
+            </a>
+            <p className="text-xs text-gray-500">WebM形式です。MP4に変換する場合はCloudConvert等をご利用ください</p>
+          </div>
+        )}
 
         {/* 画面録画ガイド */}
         <div className="max-w-lg mx-auto">
