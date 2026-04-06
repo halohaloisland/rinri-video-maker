@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import type { VideoState } from "@/lib/types";
 import type { Dispatch } from "react";
 import type { Action } from "@/hooks/useVideoState";
+import { compressAudioForTranscription, formatFileSize } from "@/lib/audio-compress";
 
 type Props = {
   state: VideoState;
@@ -29,27 +30,36 @@ export function Step1_AudioUpload({ state, dispatch, onSkipToManual }: Props) {
     [dispatch]
   );
 
+  const [compressStatus, setCompressStatus] = useState("");
+
   const handleTranscribe = useCallback(async () => {
     if (!rawFile) return;
 
     dispatch({ type: "SET_TRANSCRIBING", payload: true });
 
     try {
-      // FormDataで送信（サイズ制限を回避）
+      // Step 1: 音声を圧縮（16kHz モノラル WAV → サイズ大幅削減）
+      setCompressStatus(`音声を圧縮中...（元: ${formatFileSize(rawFile.size)}）`);
+      const compressedBlob = await compressAudioForTranscription(rawFile);
+      setCompressStatus(`圧縮完了: ${formatFileSize(compressedBlob.size)} → AIに送信中...`);
+
+      // Step 2: FormDataで送信
       const formData = new FormData();
-      formData.append("audio", rawFile);
-      formData.append("mimeType", rawFile.type || "audio/mp3");
+      formData.append("audio", compressedBlob, "compressed.wav");
+      formData.append("mimeType", "audio/wav");
 
       const res = await fetch("/api/transcribe", {
         method: "POST",
-        body: formData, // Content-Type は自動設定される
+        body: formData,
       });
+
+      setCompressStatus("");
 
       let data;
       try {
         data = await res.json();
       } catch {
-        throw new Error("サーバーからの応答が不正です。音声ファイルが大きすぎる可能性があります。");
+        throw new Error("サーバーからの応答が不正です。もう一度お試しください。");
       }
 
       if (!res.ok) {
@@ -59,6 +69,7 @@ export function Step1_AudioUpload({ state, dispatch, onSkipToManual }: Props) {
       dispatch({ type: "SET_TRANSCRIPT", payload: data.transcript });
       dispatch({ type: "SET_TEXT_SUGGESTIONS", payload: data.suggestions || [] });
     } catch (err) {
+      setCompressStatus("");
       alert(err instanceof Error ? err.message : "音声の処理に失敗しました");
     } finally {
       dispatch({ type: "SET_TRANSCRIBING", payload: false });
@@ -126,7 +137,9 @@ export function Step1_AudioUpload({ state, dispatch, onSkipToManual }: Props) {
               <div className="space-y-3">
                 <div className="flex items-center justify-center gap-2">
                   <div className="animate-spin w-5 h-5 border-2 border-amber-700 border-t-transparent rounded-full" />
-                  <span className="text-amber-700 font-medium">AIが音声を分析中...</span>
+                  <span className="text-amber-700 font-medium">
+                    {compressStatus || "AIが音声を分析中..."}
+                  </span>
                 </div>
                 <p className="text-xs text-gray-400">1〜2分かかる場合があります</p>
               </div>
