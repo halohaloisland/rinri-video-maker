@@ -42,7 +42,12 @@ export async function POST(request: Request) {
       cwd: projectRoot,
       stdio: "pipe",
       timeout: 240000, // 4分タイムアウト
-      env: { ...process.env, NODE_OPTIONS: "" },
+      env: {
+        ...process.env,
+        NODE_OPTIONS: "",
+        // Docker/Railway環境ではChromiumパスを指定
+        ...(process.env.CHROMIUM_PATH ? { PUPPETEER_EXECUTABLE_PATH: process.env.CHROMIUM_PATH } : {}),
+      },
     });
 
     // クリーンアップ
