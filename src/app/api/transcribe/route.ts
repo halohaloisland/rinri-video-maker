@@ -1,37 +1,59 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleAIFileManager } from "@google/generative-ai/server";
 import { NextResponse } from "next/server";
+import fs from "fs";
+import os from "os";
+import path from "path";
 
 const GEMINI_API_KEY = process.env.GOOGLE_GEMINI_API_KEY || "";
+
+// Vercelのbodyサイズ制限を拡大（50MB）
+export const maxDuration = 120; // 2分タイムアウト
 
 export async function POST(request: Request) {
   if (!GEMINI_API_KEY || GEMINI_API_KEY === "YOUR_API_KEY_HERE") {
     return NextResponse.json(
-      { error: "GOOGLE_GEMINI_API_KEY が設定されていません。.env.local を確認してください。" },
+      { error: "GOOGLE_GEMINI_API_KEY が設定されていません" },
       { status: 500 }
     );
   }
 
-  try {
-    const { audioBase64, mimeType } = await request.json();
+  let tmpFilePath: string | null = null;
 
-    if (!audioBase64) {
-      return NextResponse.json(
-        { error: "音声データが提供されていません" },
-        { status: 400 }
-      );
+  try {
+    // FormDataで受け取る（大きなファイル対応）
+    const formData = await request.formData();
+    const audioFile = formData.get("audio") as File | null;
+    const mimeType = (formData.get("mimeType") as string) || "audio/mp3";
+
+    if (!audioFile) {
+      return NextResponse.json({ error: "音声ファイルが提供されていません" }, { status: 400 });
     }
 
+    // 一時ファイルに保存
+    const ext = mimeType.split("/")[1]?.replace("x-", "") || "mp3";
+    tmpFilePath = path.join(os.tmpdir(), `audio-${Date.now()}.${ext}`);
+    const arrayBuffer = await audioFile.arrayBuffer();
+    fs.writeFileSync(tmpFilePath, Buffer.from(arrayBuffer));
+
+    // Gemini File APIでアップロード
+    const fileManager = new GoogleAIFileManager(GEMINI_API_KEY);
+    const uploadResult = await fileManager.uploadFile(tmpFilePath, {
+      mimeType,
+      displayName: audioFile.name || "seminar-audio",
+    });
+
+    console.log("[Transcribe] File uploaded:", uploadResult.file.uri);
+
+    // Gemini で文字起こし＆要約
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    // Step 1: 音声の文字起こしと要約
-    const base64Data = audioBase64.replace(/^data:[^;]+;base64,/, "");
-
-    const transcribeResult = await model.generateContent([
+    const result = await model.generateContent([
       {
-        inlineData: {
-          mimeType: mimeType || "audio/mp3",
-          data: base64Data,
+        fileData: {
+          mimeType: uploadResult.file.mimeType,
+          fileUri: uploadResult.file.uri,
         },
       },
       {
@@ -61,9 +83,9 @@ export async function POST(request: Request) {
       },
     ]);
 
-    const responseText = transcribeResult.response.text();
+    const responseText = result.response.text();
 
-    // JSONを抽出（マークダウンのコードブロック内にある場合も対応）
+    // JSONを抽出
     let jsonStr = responseText;
     const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (jsonMatch) {
@@ -71,6 +93,11 @@ export async function POST(request: Request) {
     }
 
     const parsed = JSON.parse(jsonStr);
+
+    // アップロードしたファイルを削除（クリーンアップ）
+    try {
+      await fileManager.deleteFile(uploadResult.file.name);
+    } catch { /* ignore cleanup errors */ }
 
     return NextResponse.json({
       transcript: parsed.transcript || "",
@@ -86,5 +113,10 @@ export async function POST(request: Request) {
     console.error("Transcribe API error:", error);
     const message = error instanceof Error ? error.message : "処理に失敗しました";
     return NextResponse.json({ error: message }, { status: 500 });
+  } finally {
+    // 一時ファイルのクリーンアップ
+    if (tmpFilePath && fs.existsSync(tmpFilePath)) {
+      try { fs.unlinkSync(tmpFilePath); } catch { /* ignore */ }
+    }
   }
 }

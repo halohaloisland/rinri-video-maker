@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { VideoState } from "@/lib/types";
 import type { Dispatch } from "react";
 import type { Action } from "@/hooks/useVideoState";
@@ -13,61 +13,57 @@ type Props = {
 
 export function Step1_AudioUpload({ state, dispatch, onSkipToManual }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // 元のFileオブジェクトを保持（FormData送信用）
+  const [rawFile, setRawFile] = useState<File | null>(null);
 
   const handleFileUpload = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        dispatch({
-          type: "SET_AUDIO_FILE",
-          payload: { data: reader.result as string, name: file.name },
-        });
-      };
-      reader.readAsDataURL(file);
+      setRawFile(file);
+      dispatch({
+        type: "SET_AUDIO_FILE",
+        payload: { data: "uploaded", name: file.name },
+      });
     },
     [dispatch]
   );
 
   const handleTranscribe = useCallback(async () => {
-    if (!state.audioFile) return;
+    if (!rawFile) return;
 
     dispatch({ type: "SET_TRANSCRIBING", payload: true });
 
     try {
-      // MIMEタイプを抽出
-      const mimeMatch = state.audioFile.match(/^data:([^;]+);base64,/);
-      const mimeType = mimeMatch ? mimeMatch[1] : "audio/mp3";
+      // FormDataで送信（サイズ制限を回避）
+      const formData = new FormData();
+      formData.append("audio", rawFile);
+      formData.append("mimeType", rawFile.type || "audio/mp3");
 
       const res = await fetch("/api/transcribe", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          audioBase64: state.audioFile,
-          mimeType,
-        }),
+        body: formData, // Content-Type は自動設定される
       });
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error("サーバーからの応答が不正です。音声ファイルが大きすぎる可能性があります。");
+      }
 
       if (!res.ok) {
         throw new Error(data.error || "APIエラーが発生しました");
       }
 
       dispatch({ type: "SET_TRANSCRIPT", payload: data.transcript });
-      dispatch({
-        type: "SET_TEXT_SUGGESTIONS",
-        payload: data.suggestions || [],
-      });
+      dispatch({ type: "SET_TEXT_SUGGESTIONS", payload: data.suggestions || [] });
     } catch (err) {
-      alert(
-        err instanceof Error ? err.message : "音声の処理に失敗しました"
-      );
+      alert(err instanceof Error ? err.message : "音声の処理に失敗しました");
     } finally {
       dispatch({ type: "SET_TRANSCRIBING", payload: false });
     }
-  }, [state.audioFile, dispatch]);
+  }, [rawFile, dispatch]);
 
   return (
     <div className="max-w-xl mx-auto space-y-8">
@@ -86,31 +82,20 @@ export function Step1_AudioUpload({ state, dispatch, onSkipToManual }: Props) {
 
       {/* ファイルアップロード */}
       <div className="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center hover:border-amber-400 transition-colors">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="audio/*"
-          onChange={handleFileUpload}
-          className="hidden"
-        />
+        <input ref={fileInputRef} type="file" accept="audio/*" onChange={handleFileUpload} className="hidden" />
 
-        {!state.audioFile ? (
+        {!rawFile ? (
           <div className="space-y-4">
             <div className="text-gray-400">
               <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
             </div>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="px-6 py-3 bg-amber-700 text-white rounded-xl hover:bg-amber-800 transition-colors font-medium"
-            >
+            <button type="button" onClick={() => fileInputRef.current?.click()}
+              className="px-6 py-3 bg-amber-700 text-white rounded-xl hover:bg-amber-800 transition-colors font-medium">
               音声ファイルを選択
             </button>
-            <p className="text-xs text-gray-400">
-              MP3, WAV, M4A, WebM に対応（最大25MB）
-            </p>
+            <p className="text-xs text-gray-400">MP3, WAV, M4A, WebM に対応</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -124,22 +109,14 @@ export function Step1_AudioUpload({ state, dispatch, onSkipToManual }: Props) {
                 <p className="text-sm font-medium text-gray-700">{state.audioFileName}</p>
                 <p className="text-xs text-green-600">アップロード完了</p>
               </div>
-              <button
-                type="button"
-                onClick={() => dispatch({ type: "CLEAR_AUDIO" })}
-                className="text-xs text-red-400 hover:text-red-600 ml-2"
-              >
-                削除
-              </button>
+              <button type="button" onClick={() => { dispatch({ type: "CLEAR_AUDIO" }); setRawFile(null); }}
+                className="text-xs text-red-400 hover:text-red-600 ml-2">削除</button>
             </div>
 
             {/* AI要約ボタン */}
             {!state.isTranscribing && state.textSuggestions.length === 0 && (
-              <button
-                type="button"
-                onClick={handleTranscribe}
-                className="px-8 py-4 bg-gradient-to-r from-amber-600 to-amber-700 text-white rounded-xl hover:from-amber-700 hover:to-amber-800 transition-all font-semibold shadow-lg text-lg"
-              >
+              <button type="button" onClick={handleTranscribe}
+                className="px-8 py-4 bg-gradient-to-r from-amber-600 to-amber-700 text-white rounded-xl hover:from-amber-700 hover:to-amber-800 transition-all font-semibold shadow-lg text-lg">
                 ✨ AIで要約する
               </button>
             )}
@@ -151,21 +128,15 @@ export function Step1_AudioUpload({ state, dispatch, onSkipToManual }: Props) {
                   <div className="animate-spin w-5 h-5 border-2 border-amber-700 border-t-transparent rounded-full" />
                   <span className="text-amber-700 font-medium">AIが音声を分析中...</span>
                 </div>
-                <p className="text-xs text-gray-400">
-                  数十秒〜数分かかる場合があります
-                </p>
+                <p className="text-xs text-gray-400">1〜2分かかる場合があります</p>
               </div>
             )}
 
             {/* 完了 */}
             {state.textSuggestions.length > 0 && (
               <div className="bg-green-50 rounded-xl p-4">
-                <p className="text-green-700 font-medium">
-                  ✅ {state.textSuggestions.length}つのテキスト案が生成されました！
-                </p>
-                <p className="text-xs text-green-600 mt-1">
-                  「次へ」を押して案を選択・編集してください
-                </p>
+                <p className="text-green-700 font-medium">✅ {state.textSuggestions.length}つのテキスト案が生成されました！</p>
+                <p className="text-xs text-green-600 mt-1">「次へ」を押して案を選択・編集してください</p>
               </div>
             )}
           </div>
@@ -174,11 +145,8 @@ export function Step1_AudioUpload({ state, dispatch, onSkipToManual }: Props) {
 
       {/* 手動入力リンク */}
       <div className="text-center">
-        <button
-          type="button"
-          onClick={onSkipToManual}
-          className="text-sm text-gray-400 hover:text-amber-700 underline transition-colors"
-        >
+        <button type="button" onClick={onSkipToManual}
+          className="text-sm text-gray-400 hover:text-amber-700 underline transition-colors">
           音声なしで手動入力する →
         </button>
       </div>
