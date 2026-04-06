@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@fontsource/noto-sans-jp": "^5.2.9",
     "@google/generative-ai": "^0.24.1",
     "@remotion/cli": "^4.0.445",

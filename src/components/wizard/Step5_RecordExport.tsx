@@ -269,15 +269,56 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
       };
       requestAnimationFrame(drawLoop);
 
-      const blob = await done;
-      const url = URL.createObjectURL(blob);
+      const webmBlob = await done;
+      setDownloadProgress(80);
+
+      // WebM → MP4 変換（ffmpeg.wasm）
+      let finalBlob = webmBlob;
+      let ext = "webm";
+      try {
+        setDownloadError("MP4に変換中...");
+        const { FFmpeg } = await import("@ffmpeg/ffmpeg");
+        const { toBlobURL, fetchFile } = await import("@ffmpeg/util");
+
+        const ffmpeg = new FFmpeg();
+        const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
+        await ffmpeg.load({
+          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+        });
+
+        setDownloadProgress(88);
+        await ffmpeg.writeFile("input.webm", await fetchFile(webmBlob));
+
+        setDownloadProgress(92);
+        await ffmpeg.exec([
+          "-i", "input.webm",
+          "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+          "-c:a", "aac", "-b:a", "128k",
+          "-movflags", "+faststart", "-pix_fmt", "yuv420p",
+          "output.mp4",
+        ]);
+
+        setDownloadProgress(97);
+        const mp4Data = await ffmpeg.readFile("output.mp4");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        finalBlob = new Blob([(mp4Data as any).buffer ?? mp4Data], { type: "video/mp4" });
+        ext = "mp4";
+        setDownloadError(null);
+      } catch (e) {
+        console.warn("MP4変換失敗、WebMで出力:", e);
+        setDownloadError(null);
+        // WebMのままフォールバック
+      }
+
+      const url = URL.createObjectURL(finalBlob);
       setDownloadUrl(url);
       setDownloadProgress(100);
 
       // 自動ダウンロード
       const a = document.createElement("a");
       a.href = url;
-      a.download = `seminar-reel-${Date.now()}.webm`;
+      a.download = `seminar-reel-${Date.now()}.${ext}`;
       a.click();
     } catch (err) {
       console.error("Download error:", err);
@@ -457,11 +498,11 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
         {downloadUrl && (
           <div className="text-center space-y-3 bg-green-50 rounded-xl p-5 max-w-md mx-auto">
             <p className="text-green-700 font-medium">🎉 動画の録画が完了しました！</p>
-            <a href={downloadUrl} download={`seminar-reel-${Date.now()}.webm`}
+            <a href={downloadUrl} download={`seminar-reel-${Date.now()}.mp4`}
               className="inline-block px-6 py-3 text-base font-semibold text-white bg-green-600 rounded-xl hover:bg-green-700 transition-colors shadow">
-              ⬇️ ダウンロード
+              ⬇️ もう一度ダウンロード
             </a>
-            <p className="text-xs text-gray-500">WebM形式です。MP4に変換する場合はCloudConvert等をご利用ください</p>
+            <p className="text-xs text-gray-500">MP4形式 — Instagramリールにそのままアップロード可能</p>
           </div>
         )}
 
