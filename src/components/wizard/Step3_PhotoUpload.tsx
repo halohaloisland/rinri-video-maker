@@ -1,0 +1,148 @@
+"use client";
+
+import { useCallback, useRef } from "react";
+import type { VideoState } from "@/lib/types";
+import type { Dispatch } from "react";
+import type { Action } from "@/hooks/useVideoState";
+
+type Props = {
+  state: VideoState;
+  dispatch: Dispatch<Action>;
+};
+
+export function Step3_PhotoUpload({ state, dispatch }: Props) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files) return;
+
+      const remaining = 3 - state.photos.length;
+      const toProcess = Array.from(files).slice(0, remaining);
+
+      toProcess.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          dispatch({ type: "ADD_PHOTO", payload: reader.result as string });
+        };
+        reader.readAsDataURL(file);
+      });
+
+      // input をリセット
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    },
+    [state.photos.length, dispatch]
+  );
+
+  const movePhoto = useCallback(
+    (fromIdx: number, direction: "up" | "down") => {
+      const toIdx = direction === "up" ? fromIdx - 1 : fromIdx + 1;
+      if (toIdx < 0 || toIdx >= state.photos.length) return;
+      const newPhotos = [...state.photos];
+      [newPhotos[fromIdx], newPhotos[toIdx]] = [newPhotos[toIdx], newPhotos[fromIdx]];
+      dispatch({ type: "REORDER_PHOTOS", payload: newPhotos });
+    },
+    [state.photos, dispatch]
+  );
+
+  return (
+    <div className="max-w-xl mx-auto space-y-6">
+      {/* ヘッダー */}
+      <div className="text-center">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-100 mb-4">
+          <svg className="w-8 h-8 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-bold text-gray-800">セミナー写真をアップロード</h2>
+        <p className="text-sm text-gray-500 mt-2">
+          セミナー中に撮影した写真を2〜3枚アップロードしてください。動画内でスライドショーとして表示されます。
+        </p>
+      </div>
+
+      {/* アップロードエリア */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={handleFileUpload}
+        className="hidden"
+      />
+
+      {/* 写真グリッド */}
+      <div className="grid grid-cols-3 gap-4">
+        {state.photos.map((photo, idx) => (
+          <div key={idx} className="relative group">
+            <div
+              className="aspect-[9/16] rounded-xl bg-cover bg-center border-2 border-gray-200"
+              style={{ backgroundImage: `url(${photo})` }}
+            />
+            {/* 操作ボタン */}
+            <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                type="button"
+                onClick={() => dispatch({ type: "REMOVE_PHOTO", payload: idx })}
+                className="w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center text-xs shadow-lg hover:bg-red-600"
+              >
+                ✕
+              </button>
+            </div>
+            {/* 並び替えボタン */}
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {idx > 0 && (
+                <button
+                  type="button"
+                  onClick={() => movePhoto(idx, "up")}
+                  className="w-7 h-7 bg-white/90 text-gray-700 rounded-full flex items-center justify-center text-xs shadow-lg hover:bg-white"
+                >
+                  ←
+                </button>
+              )}
+              {idx < state.photos.length - 1 && (
+                <button
+                  type="button"
+                  onClick={() => movePhoto(idx, "down")}
+                  className="w-7 h-7 bg-white/90 text-gray-700 rounded-full flex items-center justify-center text-xs shadow-lg hover:bg-white"
+                >
+                  →
+                </button>
+              )}
+            </div>
+            {/* 番号バッジ */}
+            <div className="absolute top-2 left-2 w-6 h-6 bg-amber-500 text-white rounded-full flex items-center justify-center text-xs font-bold shadow">
+              {idx + 1}
+            </div>
+          </div>
+        ))}
+
+        {/* 追加ボタン */}
+        {state.photos.length < 3 && (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="aspect-[9/16] rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-2 hover:border-amber-400 hover:bg-amber-50/50 transition-colors"
+          >
+            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            <span className="text-xs text-gray-400">写真を追加</span>
+          </button>
+        )}
+      </div>
+
+      {/* ステータス */}
+      <div className="text-center">
+        <p className="text-sm text-gray-500">
+          {state.photos.length}/3 枚アップロード済み
+        </p>
+        {state.photos.length === 0 && (
+          <p className="text-xs text-gray-400 mt-1">
+            写真なしでも動画は作成できます
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
