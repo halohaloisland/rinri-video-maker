@@ -93,7 +93,7 @@ export function Step1_AudioUpload({ state, dispatch, onSkipToManual }: Props) {
 
       {/* ファイルアップロード */}
       <div className="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center hover:border-amber-400 transition-colors">
-        <input ref={fileInputRef} type="file" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.webm,.mp4,.3gp,.caf" capture="environment" onChange={handleFileUpload} className="hidden" />
+        <input ref={fileInputRef} type="file" accept=".mp3,.m4a,.wav,.aac,.ogg,.webm,.mp4,.3gp,.caf,audio/*" onChange={handleFileUpload} className="hidden" />
 
         {!rawFile ? (
           <div className="space-y-4">

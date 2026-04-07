@@ -9,9 +9,10 @@ const notoSansJP = Noto_Sans_JP({
 });
 
 export const metadata: Metadata = {
-  title: "倫理セミナー動画メーカー",
+  title: "セミナー動画メーカー",
   description:
-    "倫理講演会の名言をInstagramリール風ショート動画に変換するWebアプリ",
+    "セミナー録音からInstagramリール動画を自動生成するWebアプリ",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
 };
 
 export default function RootLayout({
