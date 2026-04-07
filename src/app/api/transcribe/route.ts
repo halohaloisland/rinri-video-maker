@@ -45,11 +45,17 @@ export async function POST(request: Request) {
 
     console.log("[Transcribe] File uploaded:", uploadResult.file.uri);
 
-    // Gemini で文字起こし＆要約
+    // Gemini で文字起こし＆要約（メインモデルがダメならフォールバック）
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const models = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash-lite"];
 
-    const result = await model.generateContent([
+    let result;
+    let lastError;
+    for (const modelName of models) {
+      try {
+        console.log(`[Transcribe] Trying model: ${modelName}`);
+        const model = genAI.getGenerativeModel({ model: modelName });
+        result = await model.generateContent([
       {
         fileData: {
           mimeType: uploadResult.file.mimeType,
@@ -80,8 +86,20 @@ export async function POST(request: Request) {
     }
   ]
 }`,
-      },
-    ]);
+          },
+        ]);
+        console.log(`[Transcribe] Success with model: ${modelName}`);
+        break; // 成功したらループ終了
+      } catch (e) {
+        lastError = e;
+        console.warn(`[Transcribe] Model ${modelName} failed:`, e instanceof Error ? e.message : e);
+        continue; // 次のモデルを試す
+      }
+    }
+
+    if (!result) {
+      throw lastError || new Error("全てのモデルで処理に失敗しました。しばらく待ってから再試行してください。");
+    }
 
     const responseText = result.response.text();
 
@@ -111,7 +129,16 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Transcribe API error:", error);
-    const message = error instanceof Error ? error.message : "処理に失敗しました";
+    let message = "処理に失敗しました";
+    if (error instanceof Error) {
+      if (error.message.includes("503") || error.message.includes("Service Unavailable")) {
+        message = "AIサーバーが混雑しています。1〜2分後にもう一度お試しください。";
+      } else if (error.message.includes("429") || error.message.includes("quota") || error.message.includes("rate")) {
+        message = "API利用回数の上限に達しました。しばらく待ってから再試行してください。";
+      } else {
+        message = error.message;
+      }
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   } finally {
     // 一時ファイルのクリーンアップ
