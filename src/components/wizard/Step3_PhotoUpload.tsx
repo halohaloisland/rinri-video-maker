@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import type { VideoState } from "@/lib/types";
 import type { Dispatch } from "react";
 import type { Action } from "@/hooks/useVideoState";
+import { compressImage } from "@/lib/image-compress";
 
 type Props = {
   state: VideoState;
@@ -17,16 +18,17 @@ export function Step3_PhotoUpload({ state, dispatch }: Props) {
   const [replaceIndex, setReplaceIndex] = useState<number>(-1);
 
   const handleReplacePhoto = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file || replaceIndex < 0) return;
-      const reader = new FileReader();
-      reader.onload = () => {
+      try {
+        const compressed = await compressImage(file);
         const newPhotos = [...state.photos];
-        newPhotos[replaceIndex] = reader.result as string;
+        newPhotos[replaceIndex] = compressed;
         dispatch({ type: "REORDER_PHOTOS", payload: newPhotos });
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.warn("Image compress error:", err);
+      }
       if (replaceInputRef.current) replaceInputRef.current.value = "";
       setReplaceIndex(-1);
     },
@@ -34,35 +36,36 @@ export function Step3_PhotoUpload({ state, dispatch }: Props) {
   );
 
   const handleEndingImageUpload = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        dispatch({ type: "SET_ENDING_IMAGE", payload: reader.result as string });
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressed = await compressImage(file);
+        dispatch({ type: "SET_ENDING_IMAGE", payload: compressed });
+      } catch (err) {
+        console.warn("Image compress error:", err);
+      }
     },
     [dispatch]
   );
 
   const handleFileUpload = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
       if (!files) return;
 
       const remaining = 3 - state.photos.length;
       const toProcess = Array.from(files).slice(0, remaining);
 
-      toProcess.forEach((file) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          dispatch({ type: "ADD_PHOTO", payload: reader.result as string });
-        };
-        reader.readAsDataURL(file);
-      });
+      for (const file of toProcess) {
+        try {
+          const compressed = await compressImage(file);
+          dispatch({ type: "ADD_PHOTO", payload: compressed });
+        } catch (err) {
+          console.warn("Image compress error:", err);
+        }
+      }
 
-      // input をリセット
       if (fileInputRef.current) fileInputRef.current.value = "";
     },
     [state.photos.length, dispatch]
