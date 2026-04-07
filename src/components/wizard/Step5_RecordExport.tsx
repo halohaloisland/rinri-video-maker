@@ -167,17 +167,20 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
   const handleFullscreenPlay = useCallback(() => {
     setIsFullscreen(true);
     setShowFsControls(true);
-    // 再生開始＋3秒後にUIを非表示
-    setTimeout(() => {
-      if (playerRef.current) {
-        playerRef.current.seekTo(0);
-        playerRef.current.play();
-      }
-    }, 300);
+    // モバイル: MobilePreviewが自動再生する
+    // PC: Remotion Playerを再生
+    if (!isMobile) {
+      setTimeout(() => {
+        if (playerRef.current) {
+          playerRef.current.seekTo(0);
+          playerRef.current.play();
+        }
+      }, 300);
+    }
     fsControlsTimer.current = setTimeout(() => {
       setShowFsControls(false);
     }, 3000);
-  }, []);
+  }, [isMobile]);
 
   const handleFsTap = useCallback(() => {
     // タップでUI表示/非表示を切り替え
@@ -649,7 +652,12 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
 
           {/* モバイル: Canvas ベースのシンプルプレビュー */}
           {isMobile ? (
-            <MobilePreview state={state} durationSec={durationSec} />
+            <MobilePreview
+              state={state}
+              durationSec={durationSec}
+              fullscreen={isFullscreen}
+              onExitFullscreen={exitFullscreen}
+            />
           ) : (
             /* PC: Remotion Player */
             <div className="w-[280px] aspect-[9/16] rounded-2xl overflow-hidden shadow-2xl">

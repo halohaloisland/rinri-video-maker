@@ -6,6 +6,8 @@ import type { VideoState } from "@/lib/types";
 type Props = {
   state: VideoState;
   durationSec: number;
+  fullscreen?: boolean;
+  onExitFullscreen?: () => void;
 };
 
 /**
@@ -13,7 +15,7 @@ type Props = {
  * Remotion Playerの代わりにCanvas + requestAnimationFrameで描画
  * メモリ使用量が少なく、モバイルブラウザでも動作する
  */
-export function MobilePreview({ state, durationSec }: Props) {
+export function MobilePreview({ state, durationSec, fullscreen = false, onExitFullscreen }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -254,6 +256,14 @@ export function MobilePreview({ state, durationSec }: Props) {
     draw(0);
   }, [draw]);
 
+  // フルスクリーン時に自動再生
+  useEffect(() => {
+    if (fullscreen && !isPlaying) {
+      startPlay();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullscreen]);
+
   // クリーンアップ
   useEffect(() => {
     return () => {
@@ -263,6 +273,53 @@ export function MobilePreview({ state, durationSec }: Props) {
     };
   }, []);
 
+  // フルスクリーンモード
+  if (fullscreen) {
+    return (
+      <div
+        style={{
+          position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+          zIndex: 99999, backgroundColor: "#000",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+        onClick={() => {
+          // タップで閉じるボタン表示
+        }}
+      >
+        <canvas
+          ref={canvasRef}
+          width={1080}
+          height={1920}
+          style={{
+            maxWidth: "100vw", maxHeight: "100vh",
+            width: "auto", height: "100vh",
+            display: "block",
+          }}
+        />
+        {/* 閉じるボタン */}
+        <button
+          onClick={(e) => { e.stopPropagation(); stopPlay(); onExitFullscreen?.(); }}
+          style={{
+            position: "absolute", top: 50, right: 16, width: 44, height: 44,
+            backgroundColor: "rgba(0,0,0,0.6)", color: "#fff", border: "none",
+            borderRadius: 22, fontSize: 20, zIndex: 100000, cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          ✕
+        </button>
+        {/* 再生時間 */}
+        <div style={{
+          position: "absolute", bottom: 30, left: "50%", transform: "translateX(-50%)",
+          color: "#fff", fontSize: 14, opacity: 0.7, zIndex: 100000,
+        }}>
+          {Math.floor(currentTime)}秒 / {durationSec}秒
+        </div>
+      </div>
+    );
+  }
+
+  // 通常モード
   return (
     <div className="flex flex-col items-center gap-3">
       <div className="w-[280px] max-w-[calc(100vw-2rem)] aspect-[9/16] rounded-2xl overflow-hidden shadow-2xl bg-black">
