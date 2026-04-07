@@ -4,7 +4,6 @@ import {
   interpolate,
   spring,
   AbsoluteFill,
-  Img,
 } from "remotion";
 import type { TemplateProps } from "@/lib/types";
 import { AudioLayer } from "../elements/AudioLayer";
@@ -77,7 +76,9 @@ export function StorySlides({
                     transformOrigin: idx % 2 === 0 ? "center center" : "60% 40%",
                   }}
                 >
-                  <Img
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    alt=""
                     src={photo}
                     style={{
                       width: "100%",
@@ -162,7 +163,8 @@ export function StorySlides({
                   transform: `scale(${kenBurnsScale(photos.length * framesPerScene)})`,
                   transformOrigin: "center center",
                 }}>
-                  <Img src={endingImage} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img alt="" src={endingImage} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 </div>
                 <div style={{ position: "absolute", inset: 0, background: "linear-gradient(transparent 30%, rgba(0,0,0,0.7) 100%)" }} />
               </>
@@ -261,7 +263,8 @@ export function StorySlides({
                   transform: `scale(${kenBurnsScale(2 * framesPerScene)})`,
                   transformOrigin: "center center",
                 }}>
-                  <Img src={endingImage} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img alt="" src={endingImage} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 </div>
                 <div style={{ position: "absolute", inset: 0, background: "linear-gradient(transparent 30%, rgba(0,0,0,0.7) 100%)" }} />
               </>

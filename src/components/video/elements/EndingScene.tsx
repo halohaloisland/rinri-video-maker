@@ -1,4 +1,4 @@
-import { useCurrentFrame, useVideoConfig, interpolate, spring, AbsoluteFill, Img } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate, spring, AbsoluteFill } from "remotion";
 
 type Props = {
   endingImage?: string | null;
@@ -71,7 +71,8 @@ export function EndingScene({
             transform: `scale(${kenBurns})`,
             transformOrigin: "center center",
           }}>
-            <Img src={endingImage} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img alt="" src={endingImage} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
           </div>
           <div style={{
             position: "absolute", inset: 0,

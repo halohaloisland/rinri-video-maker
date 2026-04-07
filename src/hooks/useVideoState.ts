@@ -73,6 +73,7 @@ type TemplateData = {
   titleFont: string;
   speakerName: string;
   contextLine: string;
+  endingImage: string | null; // エンディング画像も保存
   endingText: string;
   endingTextSize: number;
   endingSubText: string;
@@ -93,6 +94,7 @@ function getTemplateData(state: VideoState): TemplateData {
     titleFont: state.titleFont,
     speakerName: state.speakerName,
     contextLine: state.contextLine,
+    endingImage: state.endingImage,
     endingText: state.endingText,
     endingTextSize: state.endingTextSize,
     endingSubText: state.endingSubText,
