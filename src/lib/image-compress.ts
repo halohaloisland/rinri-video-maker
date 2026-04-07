@@ -6,11 +6,21 @@
  * @param maxWidth 最大幅（デフォルト1080px = リール幅）
  * @param quality JPEG品質（0-1、デフォルト0.8）
  */
+// モバイル判定
+function isMobile(): boolean {
+  if (typeof window === "undefined") return false;
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
+}
+
 export function compressImage(
   file: File,
-  maxWidth = 1080,
-  quality = 0.8
+  maxWidth?: number,
+  quality?: number
 ): Promise<string> {
+  // モバイルでは画像をより小さく（メモリ節約）
+  const mobile = isMobile();
+  const _maxWidth = maxWidth ?? (mobile ? 540 : 1080);
+  const _quality = quality ?? (mobile ? 0.5 : 0.75);
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("ファイル読み込みに失敗しました"));
@@ -20,12 +30,12 @@ export function compressImage(
       img.onload = () => {
         // リサイズ計算
         let { width, height } = img;
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
+        if (width > _maxWidth) {
+          height = Math.round((height * _maxWidth) / width);
+          width = _maxWidth;
         }
-        // 高さも制限（9:16のリール用に最大1920px）
-        const maxHeight = 1920;
+        // 高さも制限
+        const maxHeight = mobile ? 960 : 1920;
         if (height > maxHeight) {
           width = Math.round((width * maxHeight) / height);
           height = maxHeight;
@@ -43,7 +53,7 @@ export function compressImage(
         ctx.drawImage(img, 0, 0, width, height);
 
         // JPEG base64 で出力（PNGより大幅にサイズ削減）
-        const compressed = canvas.toDataURL("image/jpeg", quality);
+        const compressed = canvas.toDataURL("image/jpeg", _quality);
         resolve(compressed);
       };
       img.src = reader.result as string;

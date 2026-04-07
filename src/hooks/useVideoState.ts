@@ -274,11 +274,20 @@ export function useVideoState() {
   }, []);
 
   // 状態変更時: localStorageに自動保存（デバウンス）
+  // モバイルではbase64画像をlocalStorageに保存しない（メモリ節約）
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
         const saveable = getSaveableState(state);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(saveable));
+        // localStorageのサイズ制限対策：画像データが大きすぎる場合は除外
+        const dataStr = JSON.stringify(saveable);
+        if (dataStr.length > 4_000_000) {
+          // 4MB超えたら画像を除外して保存
+          const lite = { ...saveable, photos: [], endingImage: null, backgroundImage: null, bgmFile: null, narrationAudio: null };
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(lite));
+        } else {
+          localStorage.setItem(STORAGE_KEY, dataStr);
+        }
       } catch { /* quota exceeded etc */ }
     }, 500);
     return () => clearTimeout(timer);

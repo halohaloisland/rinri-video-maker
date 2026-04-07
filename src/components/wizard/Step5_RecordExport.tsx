@@ -640,10 +640,18 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
           </div>
         </div>
 
-        {/* 右: プレビュー */}
-        <div className="flex flex-col items-center gap-4">
-          <h3 className="text-lg font-bold text-gray-800">▶️ プレビュー</h3>
-          <div className="w-[280px] max-w-[calc(100vw-2rem)] aspect-[9/16] rounded-2xl overflow-hidden shadow-2xl">
+        {/* 右: プレビュー（フルスクリーン時はこのコンテナがfixedに変化） */}
+        <div className="flex flex-col items-center gap-4" ref={fullscreenContainerRef}>
+          {!isFullscreen && <h3 className="text-lg font-bold text-gray-800">▶️ プレビュー</h3>}
+          <div
+            onClick={isFullscreen ? handleFsTap : undefined}
+            style={isFullscreen ? {
+              position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+              zIndex: 99999, backgroundColor: "#000", display: "flex",
+              alignItems: "center", justifyContent: "center",
+            } : undefined}
+            className={isFullscreen ? "" : "w-[280px] max-w-[calc(100vw-2rem)] aspect-[9/16] rounded-2xl overflow-hidden shadow-2xl"}
+          >
             <Player
               ref={playerRef}
               component={TemplateComponent}
@@ -652,11 +660,25 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
               fps={fps}
               compositionWidth={1080}
               compositionHeight={1920}
-              style={{ width: "100%", height: "100%" }}
-              controls
+              style={isFullscreen ? {
+                width: "100vw", height: "100vh", objectFit: "contain",
+              } : { width: "100%", height: "100%" }}
+              controls={!isFullscreen}
               autoPlay
               loop
             />
+            {/* フルスクリーン時の閉じるボタン */}
+            {isFullscreen && showFsControls && (
+              <button onClick={(e) => { e.stopPropagation(); exitFullscreen(); }}
+                style={{
+                  position: "absolute", top: 16, right: 16, width: 44, height: 44,
+                  backgroundColor: "rgba(0,0,0,0.6)", color: "#fff", border: "none",
+                  borderRadius: "50%", fontSize: 20, zIndex: 100000, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                ✕
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -785,72 +807,7 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
         </div>
       </div>
 
-      {/* ===== フルスクリーンオーバーレイ（録画用 - UIなし） ===== */}
-      {isFullscreen && (
-        <div
-          ref={fullscreenContainerRef}
-          onClick={handleFsTap}
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            zIndex: 99999,
-            backgroundColor: "#000",
-            overflow: "hidden",
-          }}
-        >
-          {/* 動画プレイヤー（画面を完全に埋める） */}
-          <Player
-            ref={playerRef}
-            component={TemplateComponent}
-            inputProps={inputProps}
-            durationInFrames={durationInFrames}
-            fps={fps}
-            compositionWidth={1080}
-            compositionHeight={1920}
-            style={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              width: "100vw",
-              height: "100vh",
-              objectFit: "cover",
-            }}
-            autoPlay
-            loop
-          />
-
-          {/* 閉じるボタン（タップで表示、3秒後に自動非表示） */}
-          {showFsControls && (
-            <button
-              onClick={(e) => { e.stopPropagation(); exitFullscreen(); }}
-              style={{
-                position: "absolute",
-                top: 60,
-                right: 20,
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                backgroundColor: "rgba(0,0,0,0.5)",
-                color: "#fff",
-                border: "none",
-                fontSize: 20,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                zIndex: 100001,
-                transition: "opacity 0.3s",
-              }}
-            >
-              ✕
-            </button>
-          )}
-        </div>
-      )}
+      {/* フルスクリーンオーバーレイはプレビューセクション内に統合済み */}
     </div>
   );
 }
