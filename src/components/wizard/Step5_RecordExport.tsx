@@ -58,14 +58,17 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
     };
   }, []);
 
-  // フルスクリーン切り替え
+  // フルスクリーン: body scroll lockを管理
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
-  }, []);
+    if (isFullscreen) {
+      document.body.style.overflow = "hidden";
+      // iOSでアドレスバーを隠す
+      window.scrollTo(0, 1);
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [isFullscreen]);
 
   // ===== ナレーション録音 =====
   const startRecording = useCallback(async () => {
@@ -147,27 +150,22 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
     }
   }, [state.narrationScript, ttsVoice, dispatch]);
 
-  // ===== フルスクリーン再生 =====
+  // ===== フルスクリーン再生（CSS方式 - iOS対応） =====
   const handleFullscreenPlay = useCallback(() => {
-    const container = fullscreenContainerRef.current;
-    if (!container) return;
-
-    if (container.requestFullscreen) {
-      container.requestFullscreen();
-    }
-
+    setIsFullscreen(true);
     // 少し待ってから再生開始
     setTimeout(() => {
       if (playerRef.current) {
         playerRef.current.seekTo(0);
         playerRef.current.play();
       }
-    }, 500);
+    }, 300);
   }, []);
 
   const exitFullscreen = useCallback(() => {
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
+    setIsFullscreen(false);
+    if (playerRef.current) {
+      playerRef.current.pause();
     }
   }, []);
 
@@ -519,30 +517,20 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
         {/* 右: プレビュー */}
         <div className="flex flex-col items-center gap-4">
           <h3 className="text-lg font-bold text-gray-800">▶️ プレビュー</h3>
-          <div ref={fullscreenContainerRef}
-            className={`${isFullscreen ? "w-full h-full flex items-center justify-center bg-black" : "w-[280px] aspect-[9/16]"} rounded-2xl overflow-hidden shadow-2xl`}>
-            <div className={isFullscreen ? "h-full aspect-[9/16]" : "w-full h-full"}>
-              <Player
-                ref={playerRef}
-                component={TemplateComponent}
-                inputProps={inputProps}
-                durationInFrames={durationInFrames}
-                fps={fps}
-                compositionWidth={1080}
-                compositionHeight={1920}
-                style={{ width: "100%", height: "100%" }}
-                controls
-                autoPlay
-                loop
-              />
-            </div>
-            {/* フルスクリーン時の閉じるボタン */}
-            {isFullscreen && (
-              <button onClick={exitFullscreen}
-                className="absolute top-4 right-4 w-10 h-10 bg-black/60 text-white rounded-full flex items-center justify-center text-lg z-50 hover:bg-black/80">
-                ✕
-              </button>
-            )}
+          <div className="w-[280px] aspect-[9/16] rounded-2xl overflow-hidden shadow-2xl">
+            <Player
+              ref={playerRef}
+              component={TemplateComponent}
+              inputProps={inputProps}
+              durationInFrames={durationInFrames}
+              fps={fps}
+              compositionWidth={1080}
+              compositionHeight={1920}
+              style={{ width: "100%", height: "100%" }}
+              controls
+              autoPlay
+              loop
+            />
           </div>
         </div>
       </div>
@@ -665,6 +653,95 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
           <p>💡 Wi-Fi環境で録画すると通知が入りにくくなります</p>
         </div>
       </div>
+
+      {/* ===== フルスクリーンオーバーレイ（CSS方式 - iOS対応） ===== */}
+      {isFullscreen && (
+        <div
+          ref={fullscreenContainerRef}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 99999,
+            backgroundColor: "#000",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {/* 動画プレイヤー（画面いっぱいに9:16で表示） */}
+          <div style={{
+            width: "100%",
+            height: "100%",
+            maxWidth: `${(window?.innerHeight ?? 800) * 9 / 16}px`,
+            maxHeight: "100%",
+          }}>
+            <Player
+              ref={playerRef}
+              component={TemplateComponent}
+              inputProps={inputProps}
+              durationInFrames={durationInFrames}
+              fps={fps}
+              compositionWidth={1080}
+              compositionHeight={1920}
+              style={{ width: "100%", height: "100%" }}
+              autoPlay
+              loop
+            />
+          </div>
+
+          {/* 閉じるボタン */}
+          <button
+            onClick={exitFullscreen}
+            style={{
+              position: "absolute",
+              top: 16,
+              right: 16,
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              backgroundColor: "rgba(0,0,0,0.6)",
+              color: "#fff",
+              border: "none",
+              fontSize: 20,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              zIndex: 100000,
+            }}
+          >
+            ✕
+          </button>
+
+          {/* 再生開始ヒント（タップで消える） */}
+          <div
+            onClick={() => {
+              if (playerRef.current) {
+                playerRef.current.seekTo(0);
+                playerRef.current.play();
+              }
+            }}
+            style={{
+              position: "absolute",
+              bottom: 30,
+              left: "50%",
+              transform: "translateX(-50%)",
+              padding: "8px 20px",
+              backgroundColor: "rgba(0,0,0,0.5)",
+              color: "#fff",
+              borderRadius: 20,
+              fontSize: 14,
+              whiteSpace: "nowrap",
+              zIndex: 100000,
+            }}
+          >
+            タップで最初から再生 ▶️
+          </div>
+        </div>
+      )}
     </div>
   );
 }
