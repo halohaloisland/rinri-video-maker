@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
 
@@ -8,11 +8,16 @@ const notoSansJP = Noto_Sans_JP({
   display: "swap",
 });
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export const metadata: Metadata = {
   title: "セミナー動画メーカー",
-  description:
-    "セミナー録音からInstagramリール動画を自動生成するWebアプリ",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
+  description: "セミナー録音からInstagramリール動画を自動生成するWebアプリ",
 };
 
 export default function RootLayout({

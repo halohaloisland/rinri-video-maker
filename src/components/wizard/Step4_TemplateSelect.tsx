@@ -126,7 +126,7 @@ export function Step4_TemplateSelect({ state, dispatch }: Props) {
       {/* プレビュー＋設定 */}
       <div className="flex flex-col md:flex-row gap-8 items-start">
         <div className="flex-1 flex justify-center">
-          <div className="w-[270px] aspect-[9/16] rounded-2xl overflow-hidden shadow-xl">
+          <div className="w-[270px] max-w-[calc(100vw-2rem)] aspect-[9/16] rounded-2xl overflow-hidden shadow-xl">
             <Player
               component={TemplateComponent}
               inputProps={{

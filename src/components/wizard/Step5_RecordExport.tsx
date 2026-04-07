@@ -623,7 +623,7 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
         {/* 右: プレビュー */}
         <div className="flex flex-col items-center gap-4">
           <h3 className="text-lg font-bold text-gray-800">▶️ プレビュー</h3>
-          <div className="w-[280px] aspect-[9/16] rounded-2xl overflow-hidden shadow-2xl">
+          <div className="w-[280px] max-w-[calc(100vw-2rem)] aspect-[9/16] rounded-2xl overflow-hidden shadow-2xl">
             <Player
               ref={playerRef}
               component={TemplateComponent}
