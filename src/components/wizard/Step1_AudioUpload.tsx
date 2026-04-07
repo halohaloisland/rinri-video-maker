@@ -22,6 +22,9 @@ export function Step1_AudioUpload({ state, dispatch, onSkipToManual }: Props) {
       const file = e.target.files?.[0];
       if (!file) return;
       setRawFile(file);
+      // 古い要約データをクリア（新しいファイルで再要約できるように）
+      dispatch({ type: "SET_TEXT_SUGGESTIONS", payload: [] });
+      dispatch({ type: "SET_TRANSCRIPT", payload: "" });
       dispatch({
         type: "SET_AUDIO_FILE",
         payload: { data: "uploaded", name: file.name },
@@ -124,12 +127,23 @@ export function Step1_AudioUpload({ state, dispatch, onSkipToManual }: Props) {
                 className="text-xs text-red-400 hover:text-red-600 ml-2">削除</button>
             </div>
 
-            {/* AI要約ボタン */}
-            {!state.isTranscribing && state.textSuggestions.length === 0 && (
+            {/* AI要約ボタン（rawFileがある場合のみ表示） */}
+            {!state.isTranscribing && rawFile && state.textSuggestions.length === 0 && (
               <button type="button" onClick={handleTranscribe}
                 className="px-8 py-4 bg-gradient-to-r from-amber-600 to-amber-700 text-white rounded-xl hover:from-amber-700 hover:to-amber-800 transition-all font-semibold shadow-lg text-lg">
                 ✨ AIで要約する
               </button>
+            )}
+
+            {/* rawFileがない場合（localStorageからの復元時）は再アップロードを促す */}
+            {!state.isTranscribing && !rawFile && state.textSuggestions.length === 0 && (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-500">音声ファイルを再選択して要約できます</p>
+                <button type="button" onClick={() => fileInputRef.current?.click()}
+                  className="px-6 py-3 bg-amber-700 text-white rounded-xl hover:bg-amber-800 transition-colors font-medium">
+                  音声ファイルを再選択
+                </button>
+              </div>
             )}
 
             {/* 処理中 */}
@@ -147,9 +161,19 @@ export function Step1_AudioUpload({ state, dispatch, onSkipToManual }: Props) {
 
             {/* 完了 */}
             {state.textSuggestions.length > 0 && (
-              <div className="bg-green-50 rounded-xl p-4">
+              <div className="bg-green-50 rounded-xl p-4 space-y-2">
                 <p className="text-green-700 font-medium">✅ {state.textSuggestions.length}つのテキスト案が生成されました！</p>
-                <p className="text-xs text-green-600 mt-1">「次へ」を押して案を選択・編集してください</p>
+                <p className="text-xs text-green-600">「次へ」を押して案を選択・編集してください</p>
+                <button type="button"
+                  onClick={() => {
+                    dispatch({ type: "SET_TEXT_SUGGESTIONS", payload: [] });
+                    dispatch({ type: "SET_TRANSCRIPT", payload: "" });
+                    setRawFile(null);
+                    dispatch({ type: "CLEAR_AUDIO" });
+                  }}
+                  className="text-xs text-amber-600 hover:text-amber-800 underline">
+                  別の音声で再要約する
+                </button>
               </div>
             )}
           </div>
