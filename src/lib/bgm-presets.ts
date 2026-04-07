@@ -43,7 +43,7 @@ export const BGM_PRESETS: BgmPreset[] = [
  */
 export async function generateBgmAudio(presetId: string): Promise<string> {
   const audioContext = new AudioContext({ sampleRate: 44100 });
-  const duration = 35; // 30秒動画 + 余裕
+  const duration = 30; // きっちり30秒
   const sampleRate = audioContext.sampleRate;
   const buffer = audioContext.createBuffer(2, sampleRate * duration, sampleRate);
 
@@ -65,7 +65,7 @@ export async function generateBgmAudio(presetId: string): Promise<string> {
 
   switch (presetId) {
     case "calm-piano":
-      tempo = 0.6;
+      tempo = 30 / 34; // 34拍で30秒 ≈ 0.88秒/拍
       waveType = "sine";
       chords = [
         { notes: ["C4", "E4", "G4"], start: 0, dur: 4 },
@@ -79,7 +79,7 @@ export async function generateBgmAudio(presetId: string): Promise<string> {
       ];
       break;
     case "uplifting":
-      tempo = 0.45;
+      tempo = 30 / 34; // 34拍で30秒
       waveType = "triangle";
       chords = [
         { notes: ["C4", "E4", "G4"], start: 0, dur: 2 },
@@ -98,7 +98,7 @@ export async function generateBgmAudio(presetId: string): Promise<string> {
       ];
       break;
     case "corporate":
-      tempo = 0.55;
+      tempo = 30 / 34; // 34拍で30秒
       waveType = "sine";
       chords = [
         { notes: ["C3", "G3", "C4"], start: 0, dur: 4 },
@@ -112,7 +112,7 @@ export async function generateBgmAudio(presetId: string): Promise<string> {
       ];
       break;
     case "emotional":
-      tempo = 0.65;
+      tempo = 30 / 34; // 34拍で30秒
       waveType = "sine";
       chords = [
         { notes: ["A3", "C4", "E4"], start: 0, dur: 4 },
@@ -126,7 +126,7 @@ export async function generateBgmAudio(presetId: string): Promise<string> {
       ];
       break;
     case "japanese":
-      tempo = 0.7;
+      tempo = 30 / 34; // 34拍で30秒
       waveType = "sine";
       chords = [
         { notes: ["A3", "E4"], start: 0, dur: 4 },
@@ -178,10 +178,16 @@ export async function generateBgmAudio(presetId: string): Promise<string> {
     }
   }
 
-  // クリッピング防止
+  // フェードアウト（最後1.5秒）+ クリッピング防止
+  const fadeOutStart = sampleRate * (duration - 1.5);
+  const fadeOutSamples = sampleRate * 1.5;
   for (let i = 0; i < leftChannel.length; i++) {
-    leftChannel[i] = Math.max(-1, Math.min(1, leftChannel[i]));
-    rightChannel[i] = Math.max(-1, Math.min(1, rightChannel[i]));
+    let fade = 1.0;
+    if (i >= fadeOutStart) {
+      fade = Math.max(0, 1 - (i - fadeOutStart) / fadeOutSamples);
+    }
+    leftChannel[i] = Math.max(-1, Math.min(1, leftChannel[i] * fade));
+    rightChannel[i] = Math.max(-1, Math.min(1, rightChannel[i] * fade));
   }
 
   // WAV形式に変換

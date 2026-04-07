@@ -1,7 +1,10 @@
 "use client";
 
-import { useReducer } from "react";
+import { useReducer, useEffect, useCallback } from "react";
 import type { VideoState, TemplateId, TextSuggestion } from "@/lib/types";
+
+const STORAGE_KEY = "rinri-video-state";
+const TEMPLATE_KEY = "rinri-video-template";
 
 const initialState: VideoState = {
   // Step1
@@ -51,6 +54,59 @@ const initialState: VideoState = {
   exportedBlobUrl: null,
 };
 
+// localStorage から保存可能なフィールド（大きなbase64データは除外してサイズ節約）
+type SaveableState = Omit<VideoState,
+  "audioFile" | "isTranscribing" | "isGenerating" | "isRecording" |
+  "exportStatus" | "exportProgress" | "exportedBlobUrl"
+>;
+
+function getSaveableState(state: VideoState): SaveableState {
+  const { audioFile: _a, isTranscribing: _b, isGenerating: _c, isRecording: _d,
+    exportStatus: _e, exportProgress: _f, exportedBlobUrl: _g, ...saveable } = state;
+  return saveable;
+}
+
+// テンプレートとして保存するフィールド（テキスト・設定のみ）
+type TemplateData = {
+  titleText: string;
+  titleFontSize: number;
+  titleFont: string;
+  speakerName: string;
+  contextLine: string;
+  endingText: string;
+  endingTextSize: number;
+  endingSubText: string;
+  endingSubTextSize: number;
+  selectedTemplate: TemplateId;
+  primaryColor: string;
+  accentColor: string;
+  bgmPresetId: string | null;
+  bgmVolume: number;
+  narrationVolume: number;
+  narrationStartSec: number;
+};
+
+function getTemplateData(state: VideoState): TemplateData {
+  return {
+    titleText: state.titleText,
+    titleFontSize: state.titleFontSize,
+    titleFont: state.titleFont,
+    speakerName: state.speakerName,
+    contextLine: state.contextLine,
+    endingText: state.endingText,
+    endingTextSize: state.endingTextSize,
+    endingSubText: state.endingSubText,
+    endingSubTextSize: state.endingSubTextSize,
+    selectedTemplate: state.selectedTemplate,
+    primaryColor: state.primaryColor,
+    accentColor: state.accentColor,
+    bgmPresetId: state.bgmPresetId,
+    bgmVolume: state.bgmVolume,
+    narrationVolume: state.narrationVolume,
+    narrationStartSec: state.narrationStartSec,
+  };
+}
+
 export type Action =
   // Step1
   | { type: "SET_AUDIO_FILE"; payload: { data: string; name: string } }
@@ -95,7 +151,9 @@ export type Action =
   | { type: "SET_EXPORT_PROGRESS"; payload: number }
   | { type: "SET_EXPORTED_URL"; payload: string | null }
   // Global
-  | { type: "RESET" };
+  | { type: "RESET" }
+  | { type: "LOAD_SAVED"; payload: Partial<VideoState> }
+  | { type: "LOAD_TEMPLATE"; payload: TemplateData };
 
 function reducer(state: VideoState, action: Action): VideoState {
   switch (action.type) {
@@ -187,11 +245,69 @@ function reducer(state: VideoState, action: Action): VideoState {
 
     case "RESET":
       return initialState;
+    case "LOAD_SAVED":
+      return { ...state, ...action.payload };
+    case "LOAD_TEMPLATE":
+      return { ...state, ...action.payload };
     default:
       return state;
   }
 }
 
 export function useVideoState() {
-  return useReducer(reducer, initialState);
+  const [state, dispatch] = useReducer(reducer, initialState);
+
+  // 起動時: localStorageから復元
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const step = parseInt(localStorage.getItem(STORAGE_KEY + "-step") || "0", 10);
+        dispatch({ type: "LOAD_SAVED", payload: parsed });
+        // stepも返す必要があるのでwindowイベントで通知
+        window.dispatchEvent(new CustomEvent("restore-step", { detail: step }));
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // 状態変更時: localStorageに自動保存（デバウンス）
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const saveable = getSaveableState(state);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(saveable));
+      } catch { /* quota exceeded etc */ }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [state]);
+
+  // テンプレート保存
+  const saveTemplate = useCallback(() => {
+    try {
+      const tmpl = getTemplateData(state);
+      localStorage.setItem(TEMPLATE_KEY, JSON.stringify(tmpl));
+    } catch { /* ignore */ }
+  }, [state]);
+
+  // テンプレート読み込み
+  const loadTemplate = useCallback(() => {
+    try {
+      const saved = localStorage.getItem(TEMPLATE_KEY);
+      if (saved) {
+        dispatch({ type: "LOAD_TEMPLATE", payload: JSON.parse(saved) });
+        return true;
+      }
+    } catch { /* ignore */ }
+    return false;
+  }, []);
+
+  // ステップ保存
+  const saveStep = useCallback((step: number) => {
+    try {
+      localStorage.setItem(STORAGE_KEY + "-step", String(step));
+    } catch { /* ignore */ }
+  }, []);
+
+  return [state, dispatch, { saveTemplate, loadTemplate, saveStep }] as const;
 }

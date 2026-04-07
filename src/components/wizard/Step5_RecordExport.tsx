@@ -504,11 +504,28 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
 
             {/* 現在のナレーション音声 */}
             {state.narrationAudio && !state.isRecording && (
-              <div className="flex items-center gap-3 bg-green-50 rounded-xl p-3">
-                <span className="text-green-600 text-sm font-medium">✅ {state.narrationFileName}</span>
-                <audio src={state.narrationAudio} controls className="h-8 flex-1" />
-                <button type="button" onClick={() => dispatch({ type: "SET_NARRATION_AUDIO", payload: null })}
-                  className="text-xs text-red-400 hover:text-red-600 flex-shrink-0">削除</button>
+              <div className="bg-green-50 rounded-xl p-3 space-y-2">
+                <div className="flex items-center gap-3">
+                  <span className="text-green-600 text-sm font-medium">✅ {state.narrationFileName}</span>
+                  <button type="button" onClick={() => dispatch({ type: "SET_NARRATION_AUDIO", payload: null })}
+                    className="text-xs text-red-400 hover:text-red-600 flex-shrink-0">削除</button>
+                </div>
+                <audio
+                  src={state.narrationAudio}
+                  controls
+                  className="h-8 w-full"
+                  onLoadedMetadata={(e) => {
+                    const audio = e.currentTarget;
+                    const dur = audio.duration;
+                    if (dur && isFinite(dur)) {
+                      const min = Math.floor(dur / 60);
+                      const sec = Math.floor(dur % 60);
+                      const durationEl = audio.parentElement?.querySelector("[data-duration]");
+                      if (durationEl) durationEl.textContent = `音声の長さ: ${min}分${sec.toString().padStart(2, "0")}秒`;
+                    }
+                  }}
+                />
+                <p data-duration className="text-xs text-green-700 font-medium">音声の長さ: 読み込み中...</p>
               </div>
             )}
           </div>
