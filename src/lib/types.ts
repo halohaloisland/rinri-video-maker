@@ -40,6 +40,9 @@ export type VideoState = {
 
   // ===== Step3: 画像アップロード =====
   photos: string[];
+  endingImage: string | null; // 最後の場面用画像
+  endingText: string; // 最後の場面テキスト（例: フォローお願いします）
+  endingSubText: string; // 最後の場面サブテキスト（例: @account_name）
 
   // ===== Step4: テンプレート =====
   selectedTemplate: TemplateId;
@@ -72,6 +75,9 @@ export type TemplateProps = {
   primaryColor: string;
   accentColor: string;
   photos?: string[];
+  endingImage?: string | null;
+  endingText?: string;
+  endingSubText?: string;
   bgmFile?: string | null;
   narrationAudio?: string | null;
   bgmVolume?: number;

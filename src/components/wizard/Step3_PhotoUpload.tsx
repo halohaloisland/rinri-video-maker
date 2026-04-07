@@ -12,6 +12,20 @@ type Props = {
 
 export function Step3_PhotoUpload({ state, dispatch }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const endingImageRef = useRef<HTMLInputElement>(null);
+
+  const handleEndingImageUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        dispatch({ type: "SET_ENDING_IMAGE", payload: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    },
+    [dispatch]
+  );
 
   const handleFileUpload = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,6 +156,92 @@ export function Step3_PhotoUpload({ state, dispatch }: Props) {
             写真なしでも動画は作成できます
           </p>
         )}
+      </div>
+
+      {/* ===== 最後の場面 ===== */}
+      <div className="border-t pt-6 space-y-4">
+        <div className="text-center">
+          <h3 className="text-lg font-bold text-gray-800">🎬 最後の場面（エンディング）</h3>
+          <p className="text-sm text-gray-500 mt-1">
+            動画の最後に表示する画像とテキストを設定できます
+          </p>
+        </div>
+
+        {/* エンディング画像 */}
+        <div className="flex justify-center">
+          <input
+            ref={endingImageRef}
+            type="file"
+            accept="image/*"
+            onChange={handleEndingImageUpload}
+            className="hidden"
+          />
+          {!state.endingImage ? (
+            <button
+              type="button"
+              onClick={() => endingImageRef.current?.click()}
+              className="w-40 aspect-[9/16] rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-2 hover:border-amber-400 hover:bg-amber-50/50 transition-colors"
+            >
+              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span className="text-xs text-gray-400">エンディング画像</span>
+            </button>
+          ) : (
+            <div className="relative group w-40">
+              <div
+                className="aspect-[9/16] rounded-xl bg-cover bg-center border-2 border-amber-400"
+                style={{ backgroundImage: `url(${state.endingImage})` }}
+              />
+              <div className="absolute top-2 left-2 px-2 py-0.5 bg-amber-500 text-white rounded text-[10px] font-bold">
+                END
+              </div>
+              <button
+                type="button"
+                onClick={() => dispatch({ type: "SET_ENDING_IMAGE", payload: null })}
+                className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center text-xs shadow-lg hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                ✕
+              </button>
+              <button
+                type="button"
+                onClick={() => endingImageRef.current?.click()}
+                className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-white/90 text-gray-700 rounded text-[10px] shadow opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                変更
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* エンディングテキスト */}
+        <div className="space-y-3 max-w-sm mx-auto">
+          <div>
+            <label className="block text-sm font-medium mb-1">メインテキスト</label>
+            <input
+              type="text"
+              value={state.endingText}
+              onChange={(e) => dispatch({ type: "SET_ENDING_TEXT", payload: e.target.value })}
+              placeholder="例: フォローお願いします！"
+              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none text-sm"
+              maxLength={30}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">サブテキスト</label>
+            <input
+              type="text"
+              value={state.endingSubText}
+              onChange={(e) => dispatch({ type: "SET_ENDING_SUB_TEXT", payload: e.target.value })}
+              placeholder="例: @your_account / 倫理法人会○○支部"
+              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none text-sm"
+              maxLength={50}
+            />
+          </div>
+        </div>
+        <p className="text-xs text-gray-400 text-center">
+          ※ 未設定の場合は講師名とセミナー名が表示されます
+        </p>
       </div>
     </div>
   );

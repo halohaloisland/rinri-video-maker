@@ -12,7 +12,8 @@ import { AudioLayer } from "../elements/AudioLayer";
 export function StorySlides({
   titleText, titleFontSize = 52, titleFont = "Noto Sans JP",
   quoteText, speakerName, contextLine, primaryColor, accentColor,
-  photos = [], bgmFile, narrationAudio, bgmVolume, narrationVolume, narrationStartSec,
+  photos = [], endingImage, endingText, endingSubText,
+  bgmFile, narrationAudio, bgmVolume, narrationVolume, narrationStartSec,
 }: TemplateProps) {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
@@ -147,43 +148,40 @@ export function StorySlides({
             );
           })}
 
-          {/* 最終シーン: 話者＋CTA */}
+          {/* 最終シーン: エンディング */}
           <AbsoluteFill
             style={{
               opacity: sceneOpacity(photos.length * framesPerScene),
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 100,
             }}
           >
-            <div
-              style={{
-                transform: `scale(${interpolate(
-                  textSpring(photos.length * framesPerScene),
-                  [0, 1],
-                  [0.9, 1]
-                )})`,
-                textAlign: "center",
-              }}
-            >
-              {speakerName && (
-                <div
-                  style={{ fontSize: 44, color: "#ffffff", fontWeight: 600, marginBottom: 20 }}
-                >
-                  {speakerName}
+            {/* エンディング画像背景 */}
+            {endingImage && (
+              <>
+                <div style={{
+                  position: "absolute", inset: 0,
+                  transform: `scale(${kenBurnsScale(photos.length * framesPerScene)})`,
+                  transformOrigin: "center center",
+                }}>
+                  <Img src={endingImage} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 </div>
-              )}
-              <div
-                style={{
-                  width: 80, height: 2, backgroundColor: accentColor,
-                  margin: "0 auto 30px",
-                }}
-              />
-              <div
-                style={{ fontSize: 28, color: "#ffffff99", fontWeight: 300, letterSpacing: 2 }}
-              >
-                {contextLine || "倫理法人会モーニングセミナー"}
+                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(transparent 30%, rgba(0,0,0,0.7) 100%)" }} />
+              </>
+            )}
+            {/* テキスト */}
+            <div style={{
+              position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 80,
+            }}>
+              <div style={{
+                transform: `scale(${interpolate(textSpring(photos.length * framesPerScene), [0, 1], [0.9, 1])})`,
+                textAlign: "center",
+              }}>
+                <div style={{ fontSize: 44, color: "#ffffff", fontWeight: 600, marginBottom: 20, textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+                  {endingText || speakerName || ""}
+                </div>
+                <div style={{ width: 80, height: 2, backgroundColor: accentColor, margin: "0 auto 30px" }} />
+                <div style={{ fontSize: 28, color: "#ffffffcc", fontWeight: 300, letterSpacing: 2, textShadow: "0 2px 10px rgba(0,0,0,0.5)" }}>
+                  {endingSubText || contextLine || "倫理法人会モーニングセミナー"}
+                </div>
               </div>
             </div>
           </AbsoluteFill>
@@ -254,27 +252,40 @@ export function StorySlides({
             </div>
           </AbsoluteFill>
 
-          {/* シーン3: 話者＋CTA */}
-          <AbsoluteFill
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              opacity: sceneOpacity(2 * framesPerScene), padding: 100,
-            }}
-          >
-            <div
-              style={{
+          {/* シーン3: エンディング */}
+          <AbsoluteFill style={{ opacity: sceneOpacity(2 * framesPerScene) }}>
+            {endingImage && (
+              <>
+                <div style={{
+                  position: "absolute", inset: 0,
+                  transform: `scale(${kenBurnsScale(2 * framesPerScene)})`,
+                  transformOrigin: "center center",
+                }}>
+                  <Img src={endingImage} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                </div>
+                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(transparent 30%, rgba(0,0,0,0.7) 100%)" }} />
+              </>
+            )}
+            <div style={{
+              position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 100,
+            }}>
+              <div style={{
                 transform: `scale(${interpolate(textSpring(2 * framesPerScene), [0, 1], [0.9, 1])})`,
                 textAlign: "center",
-              }}
-            >
-              {speakerName && (
-                <div style={{ fontSize: 40, color: "#ffffff", fontWeight: 600, marginBottom: 20 }}>
-                  {speakerName}
+              }}>
+                <div style={{
+                  fontSize: 40, color: "#ffffff", fontWeight: 600, marginBottom: 20,
+                  textShadow: endingImage ? "0 2px 15px rgba(0,0,0,0.5)" : "none",
+                }}>
+                  {endingText || speakerName || ""}
                 </div>
-              )}
-              <div style={{ width: 80, height: 2, backgroundColor: accentColor, margin: "0 auto 30px" }} />
-              <div style={{ fontSize: 28, color: "#ffffff99", fontWeight: 300, letterSpacing: 2 }}>
-                {contextLine || "倫理法人会モーニングセミナー"}
+                <div style={{ width: 80, height: 2, backgroundColor: accentColor, margin: "0 auto 30px" }} />
+                <div style={{
+                  fontSize: 28, color: "#ffffffcc", fontWeight: 300, letterSpacing: 2,
+                  textShadow: endingImage ? "0 2px 10px rgba(0,0,0,0.5)" : "none",
+                }}>
+                  {endingSubText || contextLine || "倫理法人会モーニングセミナー"}
+                </div>
               </div>
             </div>
           </AbsoluteFill>
