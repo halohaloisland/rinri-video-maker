@@ -8,22 +8,13 @@ import {
 import type { TemplateProps } from "@/lib/types";
 import { PhotoSlideshow } from "../elements/PhotoSlideshow";
 import { AudioLayer } from "../elements/AudioLayer";
+import { EndingScene } from "../elements/EndingScene";
 
 export function QuoteCard({
-  titleText,
-  titleFontSize = 52,
-  titleFont = "Noto Sans JP",
-  quoteText,
-  speakerName,
-  contextLine,
-  primaryColor,
-  accentColor,
-  photos = [],
-  bgmFile,
-  narrationAudio,
-  bgmVolume,
-  narrationVolume,
-  narrationStartSec,
+  titleText, titleFontSize = 52, titleFont = "Noto Sans JP",
+  quoteText, speakerName, contextLine, primaryColor, accentColor,
+  photos = [], endingImage, endingText, endingTextSize, endingSubText, endingSubTextSize,
+  bgmFile, narrationAudio, bgmVolume, narrationVolume, narrationStartSec,
 }: TemplateProps) {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
@@ -130,10 +121,16 @@ export function QuoteCard({
         </div>
       </AbsoluteFill>
 
+      {/* エンディング */}
+      <EndingScene endingImage={endingImage} endingText={endingText} endingTextSize={endingTextSize}
+        endingSubText={endingSubText} endingSubTextSize={endingSubTextSize}
+        accentColor={accentColor} speakerName={speakerName} contextLine={contextLine} />
+
       {/* プログレスバー */}
       <div style={{
         position: "absolute", bottom: 0, left: 0, height: 4,
         backgroundColor: accentColor, width: `${(frame / durationInFrames) * 100}%`, opacity: 0.6,
+        zIndex: 20,
       }} />
     </AbsoluteFill>
   );

@@ -8,11 +8,13 @@ import {
 import type { TemplateProps } from "@/lib/types";
 import { PhotoSlideshow } from "../elements/PhotoSlideshow";
 import { AudioLayer } from "../elements/AudioLayer";
+import { EndingScene } from "../elements/EndingScene";
 
 export function KineticText({
   titleText, titleFontSize = 52, titleFont = "Noto Sans JP",
   quoteText, speakerName, contextLine, primaryColor, accentColor,
-  photos = [], bgmFile, narrationAudio, bgmVolume, narrationVolume, narrationStartSec,
+  photos = [], endingImage, endingText, endingTextSize, endingSubText, endingSubTextSize,
+  bgmFile, narrationAudio, bgmVolume, narrationVolume, narrationStartSec,
 }: TemplateProps) {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
@@ -101,9 +103,13 @@ export function KineticText({
         </div>
       )}
 
+      <EndingScene endingImage={endingImage} endingText={endingText} endingTextSize={endingTextSize}
+        endingSubText={endingSubText} endingSubTextSize={endingSubTextSize}
+        accentColor={accentColor} speakerName={speakerName} contextLine={contextLine} />
+
       <div style={{
         position: "absolute", bottom: 0, left: 0, height: 4,
-        backgroundColor: accentColor, width: `${(frame / durationInFrames) * 100}%`, opacity: 0.6,
+        backgroundColor: accentColor, width: `${(frame / durationInFrames) * 100}%`, opacity: 0.6, zIndex: 20,
       }} />
     </AbsoluteFill>
   );

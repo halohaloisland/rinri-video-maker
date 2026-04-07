@@ -8,11 +8,13 @@ import {
 import type { TemplateProps } from "@/lib/types";
 import { PhotoSlideshow } from "../elements/PhotoSlideshow";
 import { AudioLayer } from "../elements/AudioLayer";
+import { EndingScene } from "../elements/EndingScene";
 
 export function GradientFadeIn({
   titleText, titleFontSize = 52, titleFont = "Noto Sans JP",
   quoteText, speakerName, contextLine, primaryColor, accentColor,
-  photos = [], bgmFile, narrationAudio, bgmVolume, narrationVolume, narrationStartSec,
+  photos = [], endingImage, endingText, endingTextSize, endingSubText, endingSubTextSize,
+  bgmFile, narrationAudio, bgmVolume, narrationVolume, narrationStartSec,
 }: TemplateProps) {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
@@ -120,9 +122,13 @@ export function GradientFadeIn({
         </div>
       </AbsoluteFill>
 
+      <EndingScene endingImage={endingImage} endingText={endingText} endingTextSize={endingTextSize}
+        endingSubText={endingSubText} endingSubTextSize={endingSubTextSize}
+        accentColor={accentColor} speakerName={speakerName} contextLine={contextLine} />
+
       <div style={{
         position: "absolute", bottom: 0, left: 0, height: 4,
-        backgroundColor: "#ffffff", width: `${(frame / durationInFrames) * 100}%`, opacity: 0.4,
+        backgroundColor: "#ffffff", width: `${(frame / durationInFrames) * 100}%`, opacity: 0.4, zIndex: 20,
       }} />
     </AbsoluteFill>
   );

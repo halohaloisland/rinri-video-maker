@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { VideoState } from "@/lib/types";
 import type { Dispatch } from "react";
 import type { Action } from "@/hooks/useVideoState";
@@ -13,6 +13,25 @@ type Props = {
 export function Step3_PhotoUpload({ state, dispatch }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const endingImageRef = useRef<HTMLInputElement>(null);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const [replaceIndex, setReplaceIndex] = useState<number>(-1);
+
+  const handleReplacePhoto = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || replaceIndex < 0) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const newPhotos = [...state.photos];
+        newPhotos[replaceIndex] = reader.result as string;
+        dispatch({ type: "REORDER_PHOTOS", payload: newPhotos });
+      };
+      reader.readAsDataURL(file);
+      if (replaceInputRef.current) replaceInputRef.current.value = "";
+      setReplaceIndex(-1);
+    },
+    [replaceIndex, state.photos, dispatch]
+  );
 
   const handleEndingImageUpload = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,47 +105,43 @@ export function Step3_PhotoUpload({ state, dispatch }: Props) {
       />
 
       {/* 写真グリッド */}
-      <div className="grid grid-cols-3 gap-4">
+      <input ref={replaceInputRef} type="file" accept="image/*" onChange={handleReplacePhoto} className="hidden" />
+      <div className="grid grid-cols-3 gap-3">
         {state.photos.map((photo, idx) => (
-          <div key={idx} className="relative group">
+          <div key={idx} className="relative">
             <div
               className="aspect-[9/16] rounded-xl bg-cover bg-center border-2 border-gray-200"
               style={{ backgroundImage: `url(${photo})` }}
             />
-            {/* 操作ボタン */}
-            <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                type="button"
-                onClick={() => dispatch({ type: "REMOVE_PHOTO", payload: idx })}
-                className="w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center text-xs shadow-lg hover:bg-red-600"
-              >
-                ✕
-              </button>
+            {/* 番号バッジ */}
+            <div className="absolute top-2 left-2 w-6 h-6 bg-amber-500 text-white rounded-full flex items-center justify-center text-xs font-bold shadow">
+              {idx + 1}
             </div>
-            {/* 並び替えボタン */}
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* 削除ボタン（常時表示） */}
+            <button type="button"
+              onClick={() => dispatch({ type: "REMOVE_PHOTO", payload: idx })}
+              className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center text-xs shadow-lg">
+              ✕
+            </button>
+            {/* 下部ボタン: 変更・並び替え（常時表示） */}
+            <div className="absolute bottom-0 left-0 right-0 bg-black/50 rounded-b-xl py-1.5 flex items-center justify-center gap-2">
+              <button type="button"
+                onClick={() => { setReplaceIndex(idx); replaceInputRef.current?.click(); }}
+                className="px-2 py-0.5 bg-white/80 text-gray-700 rounded text-[10px] font-medium">
+                変更
+              </button>
               {idx > 0 && (
-                <button
-                  type="button"
-                  onClick={() => movePhoto(idx, "up")}
-                  className="w-7 h-7 bg-white/90 text-gray-700 rounded-full flex items-center justify-center text-xs shadow-lg hover:bg-white"
-                >
+                <button type="button" onClick={() => movePhoto(idx, "up")}
+                  className="w-6 h-6 bg-white/80 text-gray-700 rounded-full flex items-center justify-center text-[10px]">
                   ←
                 </button>
               )}
               {idx < state.photos.length - 1 && (
-                <button
-                  type="button"
-                  onClick={() => movePhoto(idx, "down")}
-                  className="w-7 h-7 bg-white/90 text-gray-700 rounded-full flex items-center justify-center text-xs shadow-lg hover:bg-white"
-                >
+                <button type="button" onClick={() => movePhoto(idx, "down")}
+                  className="w-6 h-6 bg-white/80 text-gray-700 rounded-full flex items-center justify-center text-[10px]">
                   →
                 </button>
               )}
-            </div>
-            {/* 番号バッジ */}
-            <div className="absolute top-2 left-2 w-6 h-6 bg-amber-500 text-white rounded-full flex items-center justify-center text-xs font-bold shadow">
-              {idx + 1}
             </div>
           </div>
         ))}
