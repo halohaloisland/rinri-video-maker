@@ -27,7 +27,9 @@ const initialState: VideoState = {
   photos: [],
   endingImage: null,
   endingText: "",
+  endingTextSize: 56,
   endingSubText: "",
+  endingSubTextSize: 36,
 
   // Step4
   selectedTemplate: "story-slides",
@@ -73,7 +75,9 @@ export type Action =
   | { type: "REORDER_PHOTOS"; payload: string[] }
   | { type: "SET_ENDING_IMAGE"; payload: string | null }
   | { type: "SET_ENDING_TEXT"; payload: string }
+  | { type: "SET_ENDING_TEXT_SIZE"; payload: number }
   | { type: "SET_ENDING_SUB_TEXT"; payload: string }
+  | { type: "SET_ENDING_SUB_TEXT_SIZE"; payload: number }
   // Step4
   | { type: "SET_TEMPLATE"; payload: TemplateId }
   | { type: "SET_PRIMARY_COLOR"; payload: string }
@@ -143,8 +147,12 @@ function reducer(state: VideoState, action: Action): VideoState {
       return { ...state, endingImage: action.payload };
     case "SET_ENDING_TEXT":
       return { ...state, endingText: action.payload };
+    case "SET_ENDING_TEXT_SIZE":
+      return { ...state, endingTextSize: action.payload };
     case "SET_ENDING_SUB_TEXT":
       return { ...state, endingSubText: action.payload };
+    case "SET_ENDING_SUB_TEXT_SIZE":
+      return { ...state, endingSubTextSize: action.payload };
 
     case "SET_TEMPLATE":
       return { ...state, selectedTemplate: action.payload };

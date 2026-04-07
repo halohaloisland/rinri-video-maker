@@ -12,7 +12,7 @@ import { AudioLayer } from "../elements/AudioLayer";
 export function StorySlides({
   titleText, titleFontSize = 52, titleFont = "Noto Sans JP",
   quoteText, speakerName, contextLine, primaryColor, accentColor,
-  photos = [], endingImage, endingText, endingSubText,
+  photos = [], endingImage, endingText, endingTextSize = 56, endingSubText, endingSubTextSize = 36,
   bgmFile, narrationAudio, bgmVolume, narrationVolume, narrationStartSec,
 }: TemplateProps) {
   const frame = useCurrentFrame();
@@ -175,11 +175,11 @@ export function StorySlides({
                 transform: `scale(${interpolate(textSpring(photos.length * framesPerScene), [0, 1], [0.9, 1])})`,
                 textAlign: "center",
               }}>
-                <div style={{ fontSize: 44, color: "#ffffff", fontWeight: 600, marginBottom: 20, textShadow: "0 2px 15px rgba(0,0,0,0.5)" }}>
+                <div style={{ fontSize: endingTextSize, color: "#ffffff", fontWeight: 600, marginBottom: 20, textShadow: "0 2px 15px rgba(0,0,0,0.5)", lineHeight: 1.4 }}>
                   {endingText || speakerName || ""}
                 </div>
                 <div style={{ width: 80, height: 2, backgroundColor: accentColor, margin: "0 auto 30px" }} />
-                <div style={{ fontSize: 28, color: "#ffffffcc", fontWeight: 300, letterSpacing: 2, textShadow: "0 2px 10px rgba(0,0,0,0.5)" }}>
+                <div style={{ fontSize: endingSubTextSize, color: "#ffffffcc", fontWeight: 300, letterSpacing: 2, textShadow: "0 2px 10px rgba(0,0,0,0.5)", lineHeight: 1.5 }}>
                   {endingSubText || contextLine || "倫理法人会モーニングセミナー"}
                 </div>
               </div>
@@ -274,14 +274,14 @@ export function StorySlides({
                 textAlign: "center",
               }}>
                 <div style={{
-                  fontSize: 40, color: "#ffffff", fontWeight: 600, marginBottom: 20,
+                  fontSize: endingTextSize, color: "#ffffff", fontWeight: 600, marginBottom: 20, lineHeight: 1.4,
                   textShadow: endingImage ? "0 2px 15px rgba(0,0,0,0.5)" : "none",
                 }}>
                   {endingText || speakerName || ""}
                 </div>
                 <div style={{ width: 80, height: 2, backgroundColor: accentColor, margin: "0 auto 30px" }} />
                 <div style={{
-                  fontSize: 28, color: "#ffffffcc", fontWeight: 300, letterSpacing: 2,
+                  fontSize: endingSubTextSize, color: "#ffffffcc", fontWeight: 300, letterSpacing: 2, lineHeight: 1.5,
                   textShadow: endingImage ? "0 2px 10px rgba(0,0,0,0.5)" : "none",
                 }}>
                   {endingSubText || contextLine || "倫理法人会モーニングセミナー"}

@@ -215,9 +215,10 @@ export function Step3_PhotoUpload({ state, dispatch }: Props) {
         </div>
 
         {/* エンディングテキスト */}
-        <div className="space-y-3 max-w-sm mx-auto">
-          <div>
-            <label className="block text-sm font-medium mb-1">メインテキスト</label>
+        <div className="space-y-4 max-w-sm mx-auto">
+          {/* メインテキスト */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium">メインテキスト</label>
             <input
               type="text"
               value={state.endingText}
@@ -226,9 +227,17 @@ export function Step3_PhotoUpload({ state, dispatch }: Props) {
               className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none text-sm"
               maxLength={30}
             />
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 w-20">サイズ: {state.endingTextSize}px</span>
+              <input type="range" min="28" max="80" value={state.endingTextSize}
+                onChange={(e) => dispatch({ type: "SET_ENDING_TEXT_SIZE", payload: Number(e.target.value) })}
+                className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-amber-600" />
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">サブテキスト</label>
+
+          {/* サブテキスト */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium">サブテキスト</label>
             <input
               type="text"
               value={state.endingSubText}
@@ -237,6 +246,12 @@ export function Step3_PhotoUpload({ state, dispatch }: Props) {
               className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none text-sm"
               maxLength={50}
             />
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 w-20">サイズ: {state.endingSubTextSize}px</span>
+              <input type="range" min="18" max="56" value={state.endingSubTextSize}
+                onChange={(e) => dispatch({ type: "SET_ENDING_SUB_TEXT_SIZE", payload: Number(e.target.value) })}
+                className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-amber-600" />
+            </div>
           </div>
         </div>
         <p className="text-xs text-gray-400 text-center">
