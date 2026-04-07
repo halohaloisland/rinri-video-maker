@@ -210,7 +210,7 @@ export function MobilePreview({ state, durationSec, fullscreen = false, onExitFu
     if (state.bgmFile) {
       try {
         const bgm = new Audio(state.bgmFile);
-        bgm.volume = state.bgmVolume;
+        bgm.volume = fullscreen ? Math.min(state.bgmVolume * 2, 1.0) : state.bgmVolume;
         bgm.play();
         bgmRef.current = bgm;
       } catch { /* ignore */ }
@@ -220,7 +220,7 @@ export function MobilePreview({ state, durationSec, fullscreen = false, onExitFu
     if (state.narrationAudio) {
       try {
         const nar = new Audio(state.narrationAudio);
-        nar.volume = state.narrationVolume;
+        nar.volume = fullscreen ? 1.0 : state.narrationVolume;
         setTimeout(() => nar.play(), state.narrationStartSec * 1000);
         audioRef.current = nar;
       } catch { /* ignore */ }
@@ -256,13 +256,32 @@ export function MobilePreview({ state, durationSec, fullscreen = false, onExitFu
     draw(0);
   }, [draw]);
 
-  // フルスクリーン時に自動再生
+  // フルスクリーンUI表示制御
+  const [showFsUi, setShowFsUi] = useState(true);
+  const fsUiTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // フルスクリーン時に自動再生 + UI自動非表示
   useEffect(() => {
     if (fullscreen && !isPlaying) {
       startPlay();
+      // 3秒後にUIを隠す
+      setShowFsUi(true);
+      fsUiTimer.current = setTimeout(() => setShowFsUi(false), 3000);
     }
+    return () => { if (fsUiTimer.current) clearTimeout(fsUiTimer.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fullscreen]);
+
+  const handleFsTap = useCallback(() => {
+    setShowFsUi(prev => {
+      if (!prev) {
+        // 表示→3秒後に自動非表示
+        if (fsUiTimer.current) clearTimeout(fsUiTimer.current);
+        fsUiTimer.current = setTimeout(() => setShowFsUi(false), 3000);
+      }
+      return !prev;
+    });
+  }, []);
 
   // クリーンアップ
   useEffect(() => {
@@ -282,9 +301,7 @@ export function MobilePreview({ state, durationSec, fullscreen = false, onExitFu
           zIndex: 99999, backgroundColor: "#000",
           display: "flex", alignItems: "center", justifyContent: "center",
         }}
-        onClick={() => {
-          // タップで閉じるボタン表示
-        }}
+        onClick={handleFsTap}
       >
         <canvas
           ref={canvasRef}
@@ -296,25 +313,20 @@ export function MobilePreview({ state, durationSec, fullscreen = false, onExitFu
             display: "block",
           }}
         />
-        {/* 閉じるボタン */}
-        <button
-          onClick={(e) => { e.stopPropagation(); stopPlay(); onExitFullscreen?.(); }}
-          style={{
-            position: "absolute", top: 50, right: 16, width: 44, height: 44,
-            backgroundColor: "rgba(0,0,0,0.6)", color: "#fff", border: "none",
-            borderRadius: 22, fontSize: 20, zIndex: 100000, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}
-        >
-          ✕
-        </button>
-        {/* 再生時間 */}
-        <div style={{
-          position: "absolute", bottom: 30, left: "50%", transform: "translateX(-50%)",
-          color: "#fff", fontSize: 14, opacity: 0.7, zIndex: 100000,
-        }}>
-          {Math.floor(currentTime)}秒 / {durationSec}秒
-        </div>
+        {/* 閉じるボタン（タップで表示、3秒後に自動非表示） */}
+        {showFsUi && (
+          <button
+            onClick={(e) => { e.stopPropagation(); stopPlay(); onExitFullscreen?.(); }}
+            style={{
+              position: "absolute", top: 50, right: 16, width: 44, height: 44,
+              backgroundColor: "rgba(0,0,0,0.6)", color: "#fff", border: "none",
+              borderRadius: 22, fontSize: 20, zIndex: 100000, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            ✕
+          </button>
+        )}
       </div>
     );
   }
