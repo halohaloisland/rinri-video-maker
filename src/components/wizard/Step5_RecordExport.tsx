@@ -158,15 +158,34 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
   }, [state.narrationScript, ttsVoice, dispatch]);
 
   // ===== フルスクリーン再生（CSS方式 - iOS対応） =====
+  const [showFsControls, setShowFsControls] = useState(true);
+  const fsControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleFullscreenPlay = useCallback(() => {
     setIsFullscreen(true);
-    // 少し待ってから再生開始
+    setShowFsControls(true);
+    // 再生開始＋3秒後にUIを非表示
     setTimeout(() => {
       if (playerRef.current) {
         playerRef.current.seekTo(0);
         playerRef.current.play();
       }
     }, 300);
+    fsControlsTimer.current = setTimeout(() => {
+      setShowFsControls(false);
+    }, 3000);
+  }, []);
+
+  const handleFsTap = useCallback(() => {
+    // タップでUI表示/非表示を切り替え
+    setShowFsControls((prev) => {
+      if (!prev) {
+        // 表示したら3秒後に自動非表示
+        if (fsControlsTimer.current) clearTimeout(fsControlsTimer.current);
+        fsControlsTimer.current = setTimeout(() => setShowFsControls(false), 3000);
+      }
+      return !prev;
+    });
   }, []);
 
   const exitFullscreen = useCallback(() => {
@@ -174,6 +193,7 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
     if (playerRef.current) {
       playerRef.current.pause();
     }
+    if (fsControlsTimer.current) clearTimeout(fsControlsTimer.current);
   }, []);
 
   // ===== PC用ダウンロード（Canvas + MediaRecorder） =====
@@ -765,92 +785,70 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
         </div>
       </div>
 
-      {/* ===== フルスクリーンオーバーレイ（CSS方式 - iOS対応） ===== */}
+      {/* ===== フルスクリーンオーバーレイ（録画用 - UIなし） ===== */}
       {isFullscreen && (
         <div
           ref={fullscreenContainerRef}
+          onClick={handleFsTap}
           style={{
             position: "fixed",
             top: 0,
             left: 0,
-            right: 0,
-            bottom: 0,
+            width: "100vw",
+            height: "100vh",
             zIndex: 99999,
             backgroundColor: "#000",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+            overflow: "hidden",
           }}
         >
-          {/* 動画プレイヤー（画面いっぱいに9:16で表示） */}
-          <div style={{
-            width: "100%",
-            height: "100%",
-            maxWidth: `${(window?.innerHeight ?? 800) * 9 / 16}px`,
-            maxHeight: "100%",
-          }}>
-            <Player
-              ref={playerRef}
-              component={TemplateComponent}
-              inputProps={inputProps}
-              durationInFrames={durationInFrames}
-              fps={fps}
-              compositionWidth={1080}
-              compositionHeight={1920}
-              style={{ width: "100%", height: "100%" }}
-              autoPlay
-              loop
-            />
-          </div>
-
-          {/* 閉じるボタン */}
-          <button
-            onClick={exitFullscreen}
+          {/* 動画プレイヤー（画面を完全に埋める） */}
+          <Player
+            ref={playerRef}
+            component={TemplateComponent}
+            inputProps={inputProps}
+            durationInFrames={durationInFrames}
+            fps={fps}
+            compositionWidth={1080}
+            compositionHeight={1920}
             style={{
               position: "absolute",
-              top: 16,
-              right: 16,
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              backgroundColor: "rgba(0,0,0,0.6)",
-              color: "#fff",
-              border: "none",
-              fontSize: 20,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              zIndex: 100000,
-            }}
-          >
-            ✕
-          </button>
-
-          {/* 再生開始ヒント（タップで消える） */}
-          <div
-            onClick={() => {
-              if (playerRef.current) {
-                playerRef.current.seekTo(0);
-                playerRef.current.play();
-              }
-            }}
-            style={{
-              position: "absolute",
-              bottom: 30,
+              top: "50%",
               left: "50%",
-              transform: "translateX(-50%)",
-              padding: "8px 20px",
-              backgroundColor: "rgba(0,0,0,0.5)",
-              color: "#fff",
-              borderRadius: 20,
-              fontSize: 14,
-              whiteSpace: "nowrap",
-              zIndex: 100000,
+              transform: "translate(-50%, -50%)",
+              width: "100vw",
+              height: "100vh",
+              objectFit: "cover",
             }}
-          >
-            タップで最初から再生 ▶️
-          </div>
+            autoPlay
+            loop
+          />
+
+          {/* 閉じるボタン（タップで表示、3秒後に自動非表示） */}
+          {showFsControls && (
+            <button
+              onClick={(e) => { e.stopPropagation(); exitFullscreen(); }}
+              style={{
+                position: "absolute",
+                top: 60,
+                right: 20,
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: "rgba(0,0,0,0.5)",
+                color: "#fff",
+                border: "none",
+                fontSize: 20,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                zIndex: 100001,
+                transition: "opacity 0.3s",
+              }}
+            >
+              ✕
+            </button>
+          )}
         </div>
       )}
     </div>
