@@ -14,8 +14,62 @@ type Props = {
 
 export function Step1_AudioUpload({ state, dispatch, onSkipToManual }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // 元のFileオブジェクトを保持（FormData送信用）
   const [rawFile, setRawFile] = useState<File | null>(null);
+
+  // 直接録音用
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startRecordingAudio = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus" : "audio/webm";
+      const recorder = new MediaRecorder(stream, { mimeType });
+
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: mimeType });
+        const file = new File([blob], `録音_${new Date().toLocaleTimeString()}.webm`, { type: mimeType });
+        setRawFile(file);
+        dispatch({ type: "SET_TEXT_SUGGESTIONS", payload: [] });
+        dispatch({ type: "SET_TRANSCRIPT", payload: "" });
+        dispatch({ type: "SET_AUDIO_FILE", payload: { data: "uploaded", name: file.name } });
+        stream.getTracks().forEach((t) => t.stop());
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setIsRecordingAudio(true);
+      setRecordingTime(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+    } catch {
+      alert("マイクへのアクセスが許可されませんでした。ブラウザの設定を確認してください。");
+    }
+  }, [dispatch]);
+
+  const stopRecordingAudio = useCallback(() => {
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecordingAudio(false);
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  }, []);
+
+  const formatRecTime = (sec: number) =>
+    `${Math.floor(sec / 60)}:${(sec % 60).toString().padStart(2, "0")}`;
 
   const handleFileUpload = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,18 +152,40 @@ export function Step1_AudioUpload({ state, dispatch, onSkipToManual }: Props) {
       <div className="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center hover:border-amber-400 transition-colors">
         <input ref={fileInputRef} type="file" accept=".mp3,.m4a,.wav,.aac,.ogg,.webm,.mp4,.3gp,.caf,audio/*" onChange={handleFileUpload} className="hidden" />
 
-        {!rawFile ? (
-          <div className="space-y-4">
-            <div className="text-gray-400">
-              <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
+        {!rawFile && !isRecordingAudio ? (
+          <div className="space-y-5">
+            {/* 2つの方法 */}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              {/* ファイル選択 */}
+              <button type="button" onClick={() => fileInputRef.current?.click()}
+                className="px-6 py-4 bg-amber-700 text-white rounded-xl hover:bg-amber-800 transition-colors font-medium flex items-center justify-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                ファイルを選択
+              </button>
+              {/* 直接録音 */}
+              <button type="button" onClick={startRecordingAudio}
+                className="px-6 py-4 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors font-medium flex items-center justify-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-white" />
+                直接録音する
+              </button>
             </div>
-            <button type="button" onClick={() => fileInputRef.current?.click()}
-              className="px-6 py-3 bg-amber-700 text-white rounded-xl hover:bg-amber-800 transition-colors font-medium">
-              音声ファイルを選択
+            <p className="text-xs text-gray-400">ファイル: MP3, WAV, M4A, WebM / 録音: ブラウザのマイクを使用</p>
+          </div>
+        ) : isRecordingAudio ? (
+          /* 録音中UI */
+          <div className="space-y-4">
+            <div className="flex items-center justify-center gap-3">
+              <span className="w-4 h-4 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-2xl font-bold text-red-600">{formatRecTime(recordingTime)}</span>
+            </div>
+            <p className="text-sm text-gray-500">録音中... セミナーの音声を録音してください</p>
+            <button type="button" onClick={stopRecordingAudio}
+              className="px-8 py-4 bg-gray-700 text-white rounded-xl hover:bg-gray-800 transition-colors font-semibold text-lg flex items-center justify-center gap-2 mx-auto">
+              <span className="w-4 h-4 rounded-sm bg-white" />
+              録音を停止
             </button>
-            <p className="text-xs text-gray-400">MP3, WAV, M4A, WebM に対応</p>
           </div>
         ) : (
           <div className="space-y-4">
