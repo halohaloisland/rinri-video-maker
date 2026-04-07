@@ -42,6 +42,9 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [ttsVoice, setTtsVoice] = useState("Kore");
+  const [isTTSGenerating, setIsTTSGenerating] = useState(false);
+  const [ttsError, setTtsError] = useState<string | null>(null);
 
   const currentTemplate = getTemplate(state.selectedTemplate);
   const fps = currentTemplate?.fps ?? 30;
@@ -113,6 +116,36 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
     },
     [dispatch]
   );
+
+  // ===== AI音声生成 (Gemini TTS) =====
+  const handleGenerateTTS = useCallback(async () => {
+    if (!state.narrationScript) return;
+    setIsTTSGenerating(true);
+    setTtsError(null);
+
+    try {
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: state.narrationScript,
+          voice: ttsVoice,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "音声生成に失敗しました");
+
+      dispatch({
+        type: "SET_NARRATION_AUDIO",
+        payload: { data: data.audio, name: `AI音声(${data.voiceDescription})` },
+      });
+    } catch (err) {
+      setTtsError(err instanceof Error ? err.message : "音声生成に失敗しました");
+    } finally {
+      setIsTTSGenerating(false);
+    }
+  }, [state.narrationScript, ttsVoice, dispatch]);
 
   // ===== フルスクリーン再生 =====
   const handleFullscreenPlay = useCallback(() => {
@@ -377,48 +410,104 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
             </div>
           </div>
 
-          {/* 録音セクション */}
+          {/* ナレーション3択セクション */}
           <div className="space-y-4 border-t pt-4">
-            <h4 className="text-sm font-semibold text-gray-600">🎙️ ナレーション録音</h4>
-            <div className="flex items-center gap-3">
-              {!state.isRecording ? (
-                <button type="button" onClick={startRecording}
-                  className="px-5 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors font-medium flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-white" />
-                  録音開始
+            <h4 className="text-sm font-semibold text-gray-600">🎙️ ナレーション音声</h4>
+            <p className="text-xs text-gray-400">3つの方法から選べます</p>
+
+            {/* 方法1: AI音声生成 */}
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-4 space-y-3">
+              <h5 className="text-sm font-bold text-purple-800 flex items-center gap-2">
+                🤖 方法1: AI音声で自動生成（おすすめ）
+              </h5>
+              <div className="flex items-center gap-3">
+                <select
+                  value={ttsVoice}
+                  onChange={(e) => setTtsVoice(e.target.value)}
+                  className="px-3 py-2 border border-purple-200 rounded-lg text-sm bg-white"
+                >
+                  <option value="Kore">👩 女性・落ち着いた声</option>
+                  <option value="Aoede">👩 女性・明るい声</option>
+                  <option value="Charon">👨 男性・低め落ち着いた声</option>
+                  <option value="Fenrir">👨 男性・力強い声</option>
+                  <option value="Puck">👨 男性・親しみやすい声</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={handleGenerateTTS}
+                  disabled={isTTSGenerating || !state.narrationScript}
+                  className="px-5 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm flex items-center gap-2"
+                >
+                  {isTTSGenerating ? (
+                    <>
+                      <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                      生成中...
+                    </>
+                  ) : (
+                    "✨ AI音声を生成"
+                  )}
                 </button>
-              ) : (
-                <button type="button" onClick={stopRecording}
-                  className="px-5 py-3 bg-gray-700 text-white rounded-xl hover:bg-gray-800 transition-colors font-medium flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-sm bg-white" />
-                  録音停止 ({formatTime(recordingTime)})
-                </button>
+              </div>
+              {!state.narrationScript && (
+                <p className="text-xs text-purple-400">※ ナレーション台本が必要です（Step2で設定）</p>
               )}
-              {state.isRecording && (
-                <span className="flex items-center gap-2 text-red-500 text-sm">
-                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                  録音中...
-                </span>
+              {ttsError && (
+                <p className="text-xs text-red-500">{ttsError}</p>
               )}
             </div>
 
+            {/* 方法2: 自分の声で録音 */}
+            <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+              <h5 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                🎤 方法2: 自分の声で録音
+              </h5>
+              <div className="flex items-center gap-3">
+                {!state.isRecording ? (
+                  <button type="button" onClick={startRecording}
+                    className="px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors font-medium text-sm flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-white" />
+                    録音開始
+                  </button>
+                ) : (
+                  <button type="button" onClick={stopRecording}
+                    className="px-4 py-2 bg-gray-700 text-white rounded-xl hover:bg-gray-800 transition-colors font-medium text-sm flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-white" />
+                    停止 ({formatTime(recordingTime)})
+                  </button>
+                )}
+                {state.isRecording && (
+                  <span className="flex items-center gap-2 text-red-500 text-xs">
+                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                    録音中...
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* 方法3: ファイルアップロード */}
+            <div className="bg-gray-50 rounded-xl p-4">
+              <h5 className="text-sm font-bold text-gray-700 flex items-center gap-2 mb-2">
+                📁 方法3: 音声ファイルをアップロード
+              </h5>
+              <div className="flex items-center gap-3">
+                <input ref={narrationInputRef} type="file" accept="audio/*,.mp3,.m4a,.wav,.aac" onChange={handleNarrationUpload} className="hidden" />
+                <button type="button" onClick={() => narrationInputRef.current?.click()}
+                  className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                  ファイルを選択
+                </button>
+                <span className="text-xs text-gray-400">外部で録音した音声もOK</span>
+              </div>
+            </div>
+
+            {/* 現在のナレーション音声 */}
             {state.narrationAudio && !state.isRecording && (
               <div className="flex items-center gap-3 bg-green-50 rounded-xl p-3">
                 <span className="text-green-600 text-sm font-medium">✅ {state.narrationFileName}</span>
-                <audio src={state.narrationAudio} controls className="h-8" />
+                <audio src={state.narrationAudio} controls className="h-8 flex-1" />
                 <button type="button" onClick={() => dispatch({ type: "SET_NARRATION_AUDIO", payload: null })}
-                  className="text-xs text-red-400 hover:text-red-600">削除</button>
+                  className="text-xs text-red-400 hover:text-red-600 flex-shrink-0">削除</button>
               </div>
             )}
-
-            <div className="flex items-center gap-3">
-              <input ref={narrationInputRef} type="file" accept="audio/*" onChange={handleNarrationUpload} className="hidden" />
-              <button type="button" onClick={() => narrationInputRef.current?.click()}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors">
-                📁 音声ファイルをアップロード
-              </button>
-              <span className="text-xs text-gray-400">外部で録音した音声もOK</span>
-            </div>
           </div>
         </div>
 
