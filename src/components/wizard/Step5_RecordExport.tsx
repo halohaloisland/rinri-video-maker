@@ -144,7 +144,14 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
         payload: { data: data.audio, name: `AI音声(${data.voiceDescription})` },
       });
     } catch (err) {
-      setTtsError(err instanceof Error ? err.message : "音声生成に失敗しました");
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("Quota exceeded") || msg.includes("rate-limit")) {
+        const retryMatch = msg.match(/retry in ([\d.]+)/i);
+        const sec = retryMatch ? Math.ceil(Number(retryMatch[1])) : 20;
+        setTtsError(`⏳ リクエスト制限に達しました。${sec}秒後にもう一度お試しください。`);
+      } else {
+        setTtsError(msg || "音声生成に失敗しました。もう一度お試しください。");
+      }
     } finally {
       setIsTTSGenerating(false);
     }
@@ -422,55 +429,16 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
       requestAnimationFrame(drawLoop);
 
       const webmBlob = await done;
-      setDownloadProgress(80);
+      setDownloadProgress(95);
 
-      // WebM → MP4 変換（ffmpeg.wasm）
-      let finalBlob = webmBlob;
-      let ext = "webm";
-      try {
-        setDownloadError("MP4に変換中...");
-        const { FFmpeg } = await import("@ffmpeg/ffmpeg");
-        const { toBlobURL, fetchFile } = await import("@ffmpeg/util");
-
-        const ffmpeg = new FFmpeg();
-        const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
-        await ffmpeg.load({
-          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-        });
-
-        setDownloadProgress(88);
-        await ffmpeg.writeFile("input.webm", await fetchFile(webmBlob));
-
-        setDownloadProgress(92);
-        await ffmpeg.exec([
-          "-i", "input.webm",
-          "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-          "-c:a", "aac", "-b:a", "128k",
-          "-movflags", "+faststart", "-pix_fmt", "yuv420p",
-          "output.mp4",
-        ]);
-
-        setDownloadProgress(97);
-        const mp4Data = await ffmpeg.readFile("output.mp4");
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        finalBlob = new Blob([(mp4Data as any).buffer ?? mp4Data], { type: "video/mp4" });
-        ext = "mp4";
-        setDownloadError(null);
-      } catch (e) {
-        console.warn("MP4変換失敗、WebMで出力:", e);
-        setDownloadError(null);
-        // WebMのままフォールバック
-      }
-
-      const url = URL.createObjectURL(finalBlob);
+      const url = URL.createObjectURL(webmBlob);
       setDownloadUrl(url);
       setDownloadProgress(100);
 
       // 自動ダウンロード
       const a = document.createElement("a");
       a.href = url;
-      a.download = `seminar-reel-${Date.now()}.${ext}`;
+      a.download = `seminar-reel-${Date.now()}.webm`;
       a.click();
     } catch (err) {
       console.error("Download error:", err);
@@ -718,11 +686,16 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
         {downloadUrl && (
           <div className="text-center space-y-3 bg-green-50 rounded-xl p-5 max-w-md mx-auto">
             <p className="text-green-700 font-medium">🎉 動画の録画が完了しました！</p>
-            <a href={downloadUrl} download={`seminar-reel-${Date.now()}.mp4`}
+            <a href={downloadUrl} download={`seminar-reel-${Date.now()}.webm`}
               className="inline-block px-6 py-3 text-base font-semibold text-white bg-green-600 rounded-xl hover:bg-green-700 transition-colors shadow">
               ⬇️ もう一度ダウンロード
             </a>
-            <p className="text-xs text-gray-500">MP4形式 — Instagramリールにそのままアップロード可能</p>
+            <p className="text-xs text-gray-500">
+              WebM形式です。Instagramにアップする場合は
+              <a href="https://cloudconvert.com/webm-to-mp4" target="_blank" rel="noopener noreferrer"
+                className="text-blue-500 underline ml-1">CloudConvert</a>
+              でMP4に変換してください
+            </p>
           </div>
         )}
 
