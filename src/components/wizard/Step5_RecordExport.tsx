@@ -235,6 +235,18 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
         };
       });
 
+      // 画像をプリロード
+      const loadImage = (src: string): Promise<HTMLImageElement> =>
+        new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => resolve(img);
+          img.src = src;
+        });
+
+      const photoImages = await Promise.all(state.photos.map(loadImage));
+      const endingImg = state.endingImage ? await loadImage(state.endingImage) : null;
+
       // Remotion Player を再生
       if (playerRef.current) {
         playerRef.current.seekTo(0);
@@ -246,49 +258,158 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
       const t0 = Date.now();
       const primaryColor = state.primaryColor || "#1e3a5f";
       const accentColor = state.accentColor || "#e8b04a";
+      const hasPhotos = photoImages.length > 0;
+
+      // シーン構成
+      const titleDuration = 5000; // 5秒
+      const endingDuration = 5000; // 最後5秒
+      const mainDuration = totalMs - titleDuration - endingDuration;
+      const photoCount = photoImages.length || 1;
+      const perPhotoMs = mainDuration / photoCount;
+
+      // テキスト折り返し描画ヘルパー
+      const drawWrappedText = (text: string, x: number, y: number, maxWidth: number, lineHeight: number) => {
+        const chars = Array.from(text);
+        let line = "";
+        let currentY = y;
+        for (const char of chars) {
+          const testLine = line + char;
+          if (ctx.measureText(testLine).width > maxWidth && line) {
+            ctx.fillText(line, x, currentY);
+            line = char;
+            currentY += lineHeight;
+          } else {
+            line = testLine;
+          }
+        }
+        if (line) ctx.fillText(line, x, currentY);
+        return currentY;
+      };
+
+      // 写真をcanvasに描画（cover方式）
+      const drawPhoto = (img: HTMLImageElement, scale: number) => {
+        if (!img.naturalWidth) return;
+        const aspect = img.naturalWidth / img.naturalHeight;
+        const canvasAspect = 1080 / 1920;
+        let sw: number, sh: number, sx: number, sy: number;
+        if (aspect > canvasAspect) {
+          sh = img.naturalHeight;
+          sw = sh * canvasAspect;
+          sx = (img.naturalWidth - sw) / 2;
+          sy = 0;
+        } else {
+          sw = img.naturalWidth;
+          sh = sw / canvasAspect;
+          sx = 0;
+          sy = (img.naturalHeight - sh) / 2;
+        }
+        const offset = (scale - 1) * 540;
+        ctx.drawImage(img, sx, sy, sw, sh, -offset, -offset * (1920 / 1080), 1080 * scale, 1920 * scale);
+      };
 
       const drawLoop = () => {
         const elapsed = Date.now() - t0;
-        setDownloadProgress(Math.min(Math.round((elapsed / totalMs) * 100), 99));
+        const progress = elapsed / totalMs;
+        setDownloadProgress(Math.min(Math.round(progress * 75), 75)); // 前半75%
 
-        // 背景
-        ctx.fillStyle = primaryColor;
-        ctx.fillRect(0, 0, 1080, 1920);
-
-        // タイトル（冒頭5秒）
-        if (elapsed < 5000 && state.titleText) {
+        // === シーン1: タイトル（0〜5秒） ===
+        if (elapsed < titleDuration) {
+          ctx.fillStyle = primaryColor;
+          ctx.fillRect(0, 0, 1080, 1920);
+          if (hasPhotos) {
+            drawPhoto(photoImages[0], 1 + (elapsed / titleDuration) * 0.05);
+            // 暗いオーバーレイ
+            ctx.fillStyle = "rgba(0,0,0,0.5)";
+            ctx.fillRect(0, 0, 1080, 1920);
+          }
+          // タイトル
           ctx.fillStyle = "#ffffff";
           ctx.font = `bold ${state.titleFontSize || 52}px sans-serif`;
           ctx.textAlign = "center";
-          ctx.fillText(state.titleText, 540, 880);
+          if (state.titleText) {
+            drawWrappedText(state.titleText, 540, 860, 900, 70);
+          }
           if (state.contextLine) {
             ctx.font = "28px sans-serif";
-            ctx.fillStyle = "#ffffffaa";
-            ctx.fillText(state.contextLine, 540, 960);
+            ctx.fillStyle = "rgba(255,255,255,0.7)";
+            ctx.fillText(state.contextLine, 540, 980);
           }
-        } else {
+        }
+        // === シーン2: メイン（写真＋テキスト） ===
+        else if (elapsed < totalMs - endingDuration) {
+          const mainElapsed = elapsed - titleDuration;
+          const currentPhotoIdx = Math.min(Math.floor(mainElapsed / perPhotoMs), photoCount - 1);
+          const photoProgress = (mainElapsed % perPhotoMs) / perPhotoMs;
+
+          ctx.fillStyle = primaryColor;
+          ctx.fillRect(0, 0, 1080, 1920);
+
+          if (hasPhotos && photoImages[currentPhotoIdx]) {
+            const scale = 1 + photoProgress * 0.08; // Ken Burns
+            drawPhoto(photoImages[currentPhotoIdx], scale);
+            // グラデーションオーバーレイ
+            const grad = ctx.createLinearGradient(0, 0, 0, 1920);
+            grad.addColorStop(0, "transparent");
+            grad.addColorStop(0.5, "rgba(0,0,0,0.2)");
+            grad.addColorStop(1, "rgba(0,0,0,0.7)");
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 1080, 1920);
+          }
+
           // メインテキスト
           ctx.fillStyle = "#ffffff";
-          ctx.font = "bold 56px sans-serif";
+          const qSize = (state.quoteText || "").length > 40 ? 48 : 56;
+          ctx.font = `bold ${qSize}px sans-serif`;
           ctx.textAlign = "center";
-          const text = state.quoteText || "";
-          const lines = text.match(/.{1,14}/g) || [text];
-          lines.forEach((line, i) => {
-            ctx.fillText(line, 540, 750 + i * 80);
-          });
+          const textY = hasPhotos ? 1200 : 750;
+          const lastY = drawWrappedText(state.quoteText || "", 540, textY, 920, qSize * 1.5);
+
+          // アクセントライン
           ctx.fillStyle = accentColor;
-          ctx.fillRect(440, 750 + lines.length * 80 + 20, 200, 3);
+          ctx.fillRect(440, lastY + 30, 200, 3);
+
+          // 話者名
           if (state.speakerName) {
             ctx.font = "36px sans-serif";
             ctx.fillStyle = accentColor;
-            ctx.fillText(state.speakerName, 540, 750 + lines.length * 80 + 80);
+            ctx.fillText(state.speakerName, 540, lastY + 80);
           }
+        }
+        // === シーン3: エンディング（最後5秒） ===
+        else {
+          ctx.fillStyle = primaryColor;
+          ctx.fillRect(0, 0, 1080, 1920);
+
+          if (endingImg && endingImg.naturalWidth) {
+            const endElapsed = elapsed - (totalMs - endingDuration);
+            drawPhoto(endingImg, 1 + (endElapsed / endingDuration) * 0.06);
+            const grad = ctx.createLinearGradient(0, 0, 0, 1920);
+            grad.addColorStop(0, "transparent");
+            grad.addColorStop(0.4, "rgba(0,0,0,0.3)");
+            grad.addColorStop(1, "rgba(0,0,0,0.75)");
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 1080, 1920);
+          }
+
+          ctx.fillStyle = "#ffffff";
+          ctx.font = `bold ${state.endingTextSize || 56}px sans-serif`;
+          ctx.textAlign = "center";
+          const et = state.endingText || state.speakerName || "";
+          if (et) drawWrappedText(et, 540, 880, 900, 70);
+
+          ctx.fillStyle = accentColor;
+          ctx.fillRect(440, 960, 200, 2);
+
+          ctx.fillStyle = "rgba(255,255,255,0.8)";
+          ctx.font = `300 ${state.endingSubTextSize || 36}px sans-serif`;
+          const est = state.endingSubText || state.contextLine || "";
+          if (est) ctx.fillText(est, 540, 1020);
         }
 
         // プログレスバー
         ctx.fillStyle = accentColor;
         ctx.globalAlpha = 0.6;
-        ctx.fillRect(0, 1916, 1080 * (elapsed / totalMs), 4);
+        ctx.fillRect(0, 1916, 1080 * progress, 4);
         ctx.globalAlpha = 1.0;
 
         if (elapsed < totalMs) {
