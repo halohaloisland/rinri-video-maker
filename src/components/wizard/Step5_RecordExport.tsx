@@ -11,6 +11,8 @@ import { MinimalZen } from "@/components/video/templates/MinimalZen";
 import { StorySlides } from "@/components/video/templates/StorySlides";
 import type { Dispatch } from "react";
 import type { Action } from "@/hooks/useVideoState";
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { MobilePreview } from "./MobilePreview";
 
 function getTemplateComponent(id: TemplateId) {
   switch (id) {
@@ -29,6 +31,7 @@ type Props = {
 };
 
 export function Step5_RecordExport({ state, dispatch }: Props) {
+  const isMobile = useIsMobile();
   const playerRef = useRef<PlayerRef>(null);
   const fullscreenContainerRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -640,46 +643,31 @@ export function Step5_RecordExport({ state, dispatch }: Props) {
           </div>
         </div>
 
-        {/* 右: プレビュー（フルスクリーン時はこのコンテナがfixedに変化） */}
+        {/* 右: プレビュー */}
         <div className="flex flex-col items-center gap-4" ref={fullscreenContainerRef}>
-          {!isFullscreen && <h3 className="text-lg font-bold text-gray-800">▶️ プレビュー</h3>}
-          <div
-            onClick={isFullscreen ? handleFsTap : undefined}
-            style={isFullscreen ? {
-              position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
-              zIndex: 99999, backgroundColor: "#000", display: "flex",
-              alignItems: "center", justifyContent: "center",
-            } : undefined}
-            className={isFullscreen ? "" : "w-[280px] max-w-[calc(100vw-2rem)] aspect-[9/16] rounded-2xl overflow-hidden shadow-2xl"}
-          >
-            <Player
-              ref={playerRef}
-              component={TemplateComponent}
-              inputProps={inputProps}
-              durationInFrames={durationInFrames}
-              fps={fps}
-              compositionWidth={1080}
-              compositionHeight={1920}
-              style={isFullscreen ? {
-                width: "100vw", height: "100vh", objectFit: "contain",
-              } : { width: "100%", height: "100%" }}
-              controls={!isFullscreen}
-              autoPlay
-              loop
-            />
-            {/* フルスクリーン時の閉じるボタン */}
-            {isFullscreen && showFsControls && (
-              <button onClick={(e) => { e.stopPropagation(); exitFullscreen(); }}
-                style={{
-                  position: "absolute", top: 16, right: 16, width: 44, height: 44,
-                  backgroundColor: "rgba(0,0,0,0.6)", color: "#fff", border: "none",
-                  borderRadius: "50%", fontSize: 20, zIndex: 100000, cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                ✕
-              </button>
-            )}
-          </div>
+          <h3 className="text-lg font-bold text-gray-800">▶️ プレビュー</h3>
+
+          {/* モバイル: Canvas ベースのシンプルプレビュー */}
+          {isMobile ? (
+            <MobilePreview state={state} durationSec={durationSec} />
+          ) : (
+            /* PC: Remotion Player */
+            <div className="w-[280px] aspect-[9/16] rounded-2xl overflow-hidden shadow-2xl">
+              <Player
+                ref={playerRef}
+                component={TemplateComponent}
+                inputProps={inputProps}
+                durationInFrames={durationInFrames}
+                fps={fps}
+                compositionWidth={1080}
+                compositionHeight={1920}
+                style={{ width: "100%", height: "100%" }}
+                controls
+                autoPlay
+                loop
+              />
+            </div>
+          )}
         </div>
       </div>
 

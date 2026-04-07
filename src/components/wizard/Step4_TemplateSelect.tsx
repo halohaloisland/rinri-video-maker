@@ -12,6 +12,8 @@ import { MinimalZen } from "@/components/video/templates/MinimalZen";
 import { StorySlides } from "@/components/video/templates/StorySlides";
 import type { Dispatch } from "react";
 import type { Action } from "@/hooks/useVideoState";
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { MobilePreview } from "./MobilePreview";
 
 type Props = {
   state: VideoState;
@@ -30,6 +32,7 @@ function getTemplateComponent(id: TemplateId) {
 }
 
 export function Step4_TemplateSelect({ state, dispatch }: Props) {
+  const isMobile = useIsMobile();
   const bgmInputRef = useRef<HTMLInputElement>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const [previewingId, setPreviewingId] = useState<string | null>(null);
@@ -126,41 +129,45 @@ export function Step4_TemplateSelect({ state, dispatch }: Props) {
       {/* プレビュー＋設定 */}
       <div className="flex flex-col md:flex-row gap-8 items-start">
         <div className="flex-1 flex justify-center">
-          <div className="w-[270px] max-w-[calc(100vw-2rem)] aspect-[9/16] rounded-2xl overflow-hidden shadow-xl">
-            <Player
-              component={TemplateComponent}
-              inputProps={{
-                titleText: state.titleText,
-                titleFontSize: state.titleFontSize,
-                titleFont: state.titleFont,
-                quoteText: state.quoteText || "ここに名言が表示されます",
-                speakerName: state.speakerName,
-                contextLine: state.contextLine,
-                backgroundImage: state.backgroundImage,
-                primaryColor: state.primaryColor,
-                accentColor: state.accentColor,
-                photos: state.photos,
-                endingImage: state.endingImage,
-                endingText: state.endingText,
-                endingTextSize: state.endingTextSize,
-                endingSubText: state.endingSubText,
-                endingSubTextSize: state.endingSubTextSize,
-                bgmFile: state.bgmFile,
-                narrationAudio: state.narrationAudio,
-                bgmVolume: state.bgmVolume,
-                narrationVolume: state.narrationVolume,
-                narrationStartSec: state.narrationStartSec,
-              }}
-              durationInFrames={currentTemplate?.durationInFrames ?? 900}
-              fps={currentTemplate?.fps ?? 30}
-              compositionWidth={1080}
-              compositionHeight={1920}
-              style={{ width: "100%", height: "100%" }}
-              controls
-              autoPlay
-              loop
-            />
-          </div>
+          {isMobile ? (
+            <MobilePreview state={state} durationSec={Math.round((currentTemplate?.durationInFrames ?? 900) / (currentTemplate?.fps ?? 30))} />
+          ) : (
+            <div className="w-[270px] max-w-[calc(100vw-2rem)] aspect-[9/16] rounded-2xl overflow-hidden shadow-xl">
+              <Player
+                component={TemplateComponent}
+                inputProps={{
+                  titleText: state.titleText,
+                  titleFontSize: state.titleFontSize,
+                  titleFont: state.titleFont,
+                  quoteText: state.quoteText || "ここに名言が表示されます",
+                  speakerName: state.speakerName,
+                  contextLine: state.contextLine,
+                  backgroundImage: state.backgroundImage,
+                  primaryColor: state.primaryColor,
+                  accentColor: state.accentColor,
+                  photos: state.photos,
+                  endingImage: state.endingImage,
+                  endingText: state.endingText,
+                  endingTextSize: state.endingTextSize,
+                  endingSubText: state.endingSubText,
+                  endingSubTextSize: state.endingSubTextSize,
+                  bgmFile: state.bgmFile,
+                  narrationAudio: state.narrationAudio,
+                  bgmVolume: state.bgmVolume,
+                  narrationVolume: state.narrationVolume,
+                  narrationStartSec: state.narrationStartSec,
+                }}
+                durationInFrames={currentTemplate?.durationInFrames ?? 900}
+                fps={currentTemplate?.fps ?? 30}
+                compositionWidth={1080}
+                compositionHeight={1920}
+                style={{ width: "100%", height: "100%" }}
+                controls
+                autoPlay
+                loop
+              />
+            </div>
+          )}
         </div>
 
         {/* 設定パネル */}
